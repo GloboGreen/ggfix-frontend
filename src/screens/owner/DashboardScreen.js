@@ -1,32 +1,29 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  ActivityIndicator,
-  RefreshControl,
-  Platform,
-} from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import {
+  PlusCircle,
+  Receipt,
+  BarChart3,
+  HelpCircle,
+  Users,
+  ShoppingBag,
+  CheckCircle2,
+  UserCheck,
+  Wrench,
+  PackageCheck,
+  Truck,
+  PackageOpen,
+  Clock,
+  TrendingUp,
+  Bell,
+  ChevronRight,
+  ShieldCheck,
+} from 'lucide-react-native';
 import { ticketApi } from '../../api/client';
+import { Loader, SectionHeader, Badge } from '../../components/rnr';
 
-const RADIAL_SIZE = 56;
-const RADIAL_RING = 8;
-const RADIAL_INNER = RADIAL_SIZE - RADIAL_RING * 2;
-
-/** Lighten hex color for glassy highlight */
-function lighten(hex, pct = 0.4) {
-  const num = parseInt(hex.replace('#', ''), 16);
-  const r = Math.min(255, ((num >> 16) & 0xff) + (255 - (num >> 16 & 0xff)) * pct);
-  const g = Math.min(255, ((num >> 8) & 0xff) + (255 - (num >> 8 & 0xff)) * pct);
-  const b = Math.min(255, (num & 0xff) + (255 - (num & 0xff)) * pct);
-  return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`;
-}
-
-// Map backend status counts to dashboard tiles
 function useBookingCounts() {
   const [counts, setCounts] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -46,18 +43,15 @@ function useBookingCounts() {
     }
   }, []);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
   const summary = counts
     ? {
         serviceAccepted: Number(counts.CREATED ?? 0),
         technicianAssigned: Number(counts.assignedCount ?? 0),
-        inServiceProcess:
-          Number(counts.IN_DIAGNOSIS ?? 0) + Number(counts.IN_REPAIR ?? 0),
+        inServiceProcess: Number(counts.IN_DIAGNOSIS ?? 0) + Number(counts.IN_REPAIR ?? 0),
         workCompleted: Number(counts.READY ?? 0),
-        outForDelivery: Number(counts.READY ?? 0), // same as ready for pickup
+        outForDelivery: Number(counts.READY ?? 0),
         delivered: Number(counts.DELIVERED ?? 0),
         workPending: Number(counts.QUOTED ?? 0) + Number(counts.APPROVED ?? 0),
         total: Number(counts.total ?? 0),
@@ -66,6 +60,16 @@ function useBookingCounts() {
 
   return { summary, loading, error, refresh: load };
 }
+
+const STATUSES = [
+  { key: 'serviceAccepted',   label: 'Service\nAccepted',   icon: CheckCircle2, color: '#10B981', bg: 'bg-success/10',   text: 'text-success'   },
+  { key: 'technicianAssigned',label: 'Technician\nAssigned',icon: UserCheck,    color: '#0EA5E9', bg: 'bg-info/10',      text: 'text-info'      },
+  { key: 'inServiceProcess',  label: 'In Service\nProcess', icon: Wrench,       color: '#2563EB', bg: 'bg-secondary/10', text: 'text-secondary' },
+  { key: 'workCompleted',     label: 'Work\nCompleted',     icon: PackageCheck, color: '#7C3AED', bg: 'bg-primary/10',   text: 'text-primary'   },
+  { key: 'outForDelivery',    label: 'Out for\nDelivery',   icon: Truck,        color: '#F59E0B', bg: 'bg-warning/10',   text: 'text-warning'   },
+  { key: 'delivered',         label: 'Delivered',           icon: PackageOpen,  color: '#10B981', bg: 'bg-success/10',   text: 'text-success'   },
+  { key: 'workPending',       label: 'Work\nPending',       icon: Clock,        color: '#EF4444', bg: 'bg-danger/10',    text: 'text-danger'    },
+];
 
 export default function DashboardScreen({ navigation }) {
   const { summary, loading, error, refresh } = useBookingCounts();
@@ -77,259 +81,161 @@ export default function DashboardScreen({ navigation }) {
     setRefreshing(false);
   };
 
-  const shopName = 'Shop';
-  const ownerName = 'Owner';
+  const gotoParent = (route) => {
+    const parent = navigation.getParent && navigation.getParent();
+    if (parent) parent.navigate(route);
+    else navigation.navigate(route);
+  };
+
+  if (loading && !summary) {
+    return <Loader label="Loading dashboard..." />;
+  }
+
+  const total = summary?.total ?? 0;
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <View className="flex-1 bg-background">
+      <SafeAreaView edges={['top']} style={{ backgroundColor: '#00008B' }}>
+        <LinearGradient
+          colors={['#00008B', '#1E1EAC', '#2563EB']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{ paddingTop: 12, paddingBottom: 40, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 }}
+        >
+          <View className="px-4 flex-row items-center">
+            <View className="h-11 w-11 rounded-2xl bg-white/15 items-center justify-center mr-3">
+              <Wrench size={20} color="#fff" />
+            </View>
+            <View className="flex-1">
+              <Text className="text-white/75 text-[11px]">Good day</Text>
+              <Text className="text-white text-[18px] font-extrabold">Shop · Owner</Text>
+              <View className="flex-row items-center mt-0.5">
+                <ShieldCheck size={11} color="#A7F3D0" />
+                <Text className="text-emerald-200 text-[10px] font-bold ml-1">VERIFIED SHOP OWNER</Text>
+              </View>
+            </View>
+            <Pressable className="h-10 w-10 rounded-full bg-white/15 items-center justify-center active:opacity-80">
+              <Bell size={18} color="#fff" />
+            </Pressable>
+          </View>
+
+          <View className="px-4 mt-4">
+            <Text className="text-white/80 text-[12px]">Today at a glance</Text>
+          </View>
+        </LinearGradient>
+      </SafeAreaView>
+
       <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.content}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+        className="flex-1"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 32 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00008B" />}
       >
-        <View style={styles.headerCard}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.shopName}>{shopName}</Text>
-            <Text style={styles.owner}>{ownerName}</Text>
-            <Text style={styles.caption}>Verified shop owner</Text>
+        {/* KPI strip */}
+        <View className="mx-4 -mt-7 bg-card border border-border rounded-3xl p-4 flex-row"
+              style={{ shadowColor: '#0F172A', shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 8 }}>
+          <View className="flex-1 px-1">
+            <Text className="text-[10px] font-bold text-text-muted tracking-widest">TOTAL BOOKINGS</Text>
+            <Text className="text-[26px] font-extrabold text-primary mt-1">{total}</Text>
+            <View className="flex-row items-center mt-0.5">
+              <TrendingUp size={11} color="#10B981" />
+              <Text className="text-[10px] font-bold text-success ml-1">All-time</Text>
+            </View>
           </View>
-          <View style={styles.headerRight}>
-            <Text style={styles.headerMetricLabel}>Total Bookings</Text>
-            <Text style={styles.headerMetricValue}>
-              {summary != null ? String(summary.total) : '—'}
+          <View className="w-px bg-border mx-1" />
+          <View className="flex-1 px-1">
+            <Text className="text-[10px] font-bold text-text-muted tracking-widest">ACTIVE</Text>
+            <Text className="text-[26px] font-extrabold text-secondary mt-1">
+              {(summary?.serviceAccepted || 0) + (summary?.technicianAssigned || 0) + (summary?.inServiceProcess || 0)}
             </Text>
+            <Text className="text-[10px] font-bold text-text-muted mt-0.5">in pipeline</Text>
+          </View>
+          <View className="w-px bg-border mx-1" />
+          <View className="flex-1 px-1">
+            <Text className="text-[10px] font-bold text-text-muted tracking-widest">DELIVERED</Text>
+            <Text className="text-[26px] font-extrabold text-success mt-1">{summary?.delivered || 0}</Text>
+            <Text className="text-[10px] font-bold text-text-muted mt-0.5">closed jobs</Text>
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Quick Access</Text>
-        <View style={styles.quickGrid}>
-          <QuickTile
-            icon="add-circle-outline"
-            label="New Booking"
-            onPress={() => {
-              const parent = navigation.getParent && navigation.getParent();
-              if (parent) {
-                parent.navigate('NewBooking');
-              } else {
-                navigation.navigate('NewBooking');
-              }
-            }}
-          />
-          <QuickTile
-            icon="receipt-outline"
-            label="Billing & Delivery"
-            onPress={() => navigation.navigate('Billing')}
-          />
-          <QuickTile
-            icon="bar-chart-outline"
-            label="Sales Report"
-            onPress={() => navigation.navigate('Reports')}
-          />
-          <QuickTile
-            icon="help-circle-outline"
-            label="Enquiry"
-            onPress={() => {}}
-          />
-          <QuickTile
-            icon="people-outline"
-            label="Employees"
-            onPress={() => {
-              const parent = navigation.getParent && navigation.getParent();
-              if (parent) parent.navigate('OwnerEmployeeList');
-              else navigation.navigate('OwnerEmployeeList');
-            }}
-          />
-          <QuickTile
-            icon="bag-handle-outline"
-            label="Buy / Sell"
-            onPress={() => navigation.navigate('BuySell')}
-          />
+        <SectionHeader title="Quick Access" caption="Tap to jump in" />
+        <View className="px-3 flex-row flex-wrap">
+          {[
+            { key: 'NewBooking',   label: 'New Booking',      icon: PlusCircle, color: '#00008B', bg: '#EEF2FF', via: 'parent' },
+            { key: 'Billing',      label: 'Billing & Delivery', icon: Receipt,  color: '#2563EB', bg: '#DBEAFE' },
+            { key: 'Reports',      label: 'Sales Report',      icon: BarChart3, color: '#10B981', bg: '#D1FAE5' },
+            { key: '_enquiry',     label: 'Enquiry',           icon: HelpCircle, color: '#F59E0B', bg: '#FEF3C7' },
+            { key: 'OwnerEmployeeList', label: 'Employees',    icon: Users,     color: '#7C3AED', bg: '#EDE9FE', via: 'parent' },
+            { key: 'BuySell',      label: 'Buy / Sell',        icon: ShoppingBag, color: '#EC4899', bg: '#FCE7F3' },
+          ].map((t) => {
+            const Icon = t.icon;
+            return (
+              <View key={t.label} style={{ width: '33.333%' }} className="p-1.5">
+                <Pressable
+                  onPress={() => { if (t.via === 'parent') gotoParent(t.key); else navigation.navigate(t.key); }}
+                  className="bg-card border border-border rounded-2xl p-3 items-center active:opacity-80"
+                  style={{ shadowColor: '#0F172A', shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 1 }}
+                >
+                  <View className="h-11 w-11 rounded-2xl items-center justify-center mb-2" style={{ backgroundColor: t.bg }}>
+                    <Icon size={20} color={t.color} />
+                  </View>
+                  <Text className="text-[11px] font-extrabold text-text text-center" numberOfLines={2}>{t.label}</Text>
+                </Pressable>
+              </View>
+            );
+          })}
         </View>
 
-        <Text style={styles.sectionTitle}>Booking Status Summary</Text>
-        {loading && !summary ? (
-          <ActivityIndicator size="small" color="#3B4FD7" style={{ marginVertical: 16 }} />
-        ) : error ? (
-          <Text style={styles.errorText}>{error}</Text>
+        <SectionHeader title="Booking Status" caption="Live pipeline" action="View all" onAction={() => gotoParent('Bookings')} />
+        {error ? (
+          <View className="mx-4 bg-danger/10 border border-danger/30 rounded-xl px-3 py-2">
+            <Text className="text-[12px] text-danger">{error}</Text>
+          </View>
         ) : (
-          <View style={styles.statusGrid}>
-            <StatusTile
-              label="Service Accepted"
-              value={summary ? String(summary.serviceAccepted) : '0'}
-              color="#22C55E"
-            />
-            <StatusTile
-              label="Technician Assigned"
-              value={summary ? String(summary.technicianAssigned) : '0'}
-              color="#22C55E"
-            />
-            <StatusTile
-              label="In Service Process"
-              value={summary ? String(summary.inServiceProcess) : '0'}
-              color="#0EA5E9"
-            />
-            <StatusTile
-              label="Work Completed"
-              value={summary ? String(summary.workCompleted) : '0'}
-              color="#6366F1"
-            />
-            <StatusTile
-              label="Out for Delivery"
-              value={summary ? String(summary.outForDelivery) : '0'}
-              color="#F97316"
-            />
-            <StatusTile
-              label="Delivered"
-              value={summary ? String(summary.delivered) : '0'}
-              color="#22C55E"
-            />
-            <StatusTile
-              label="Work Pending"
-              value={summary ? String(summary.workPending) : '0'}
-              color="#F97316"
-            />
+          <View className="px-3 flex-row flex-wrap">
+            {STATUSES.map((s) => {
+              const Icon = s.icon;
+              const value = summary?.[s.key] ?? 0;
+              const isHot = value > 0;
+              return (
+                <View key={s.key} style={{ width: '50%' }} className="p-1.5">
+                  <Pressable
+                    onPress={() => gotoParent('Bookings')}
+                    className="bg-card border border-border rounded-2xl p-3 flex-row items-center active:opacity-80"
+                    style={{ shadowColor: '#0F172A', shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 1 }}
+                  >
+                    <View className={`h-11 w-11 rounded-2xl items-center justify-center mr-3 ${s.bg}`}>
+                      <Icon size={20} color={s.color} />
+                    </View>
+                    <View className="flex-1">
+                      <Text className={`text-[20px] font-extrabold ${s.text}`}>{value}</Text>
+                      <Text className="text-[11px] text-text-muted leading-tight" numberOfLines={2}>{s.label.replace('\n', ' ')}</Text>
+                    </View>
+                    {isHot ? <Badge variant={value > 3 ? 'softDanger' : 'softWarning'}>{value > 3 ? 'HOT' : 'NEW'}</Badge> : null}
+                  </Pressable>
+                </View>
+              );
+            })}
           </View>
         )}
-      </ScrollView>
-    </SafeAreaView>
-  );
-}
 
-function QuickTile({ icon, label, onPress }) {
-  return (
-    <TouchableOpacity style={styles.quickTile} onPress={onPress}>
-      <Ionicons name={icon} size={22} color="#111827" />
-      <Text style={styles.quickLabel}>{label}</Text>
-    </TouchableOpacity>
-  );
-}
-
-function StatusTile({ label, value, color }) {
-  const highlight = lighten(color, 0.5);
-  return (
-    <View style={styles.statusTile}>
-      <View style={styles.radialWrap}>
-        <View style={[styles.radialOuter, { shadowColor: color, borderColor: highlight }]}>
-          <View style={[styles.radialRing, { backgroundColor: color }]} />
-          <View style={styles.radialGloss} />
-          <View style={styles.radialInner}>
-            <Text style={[styles.radialValue, { color }]} numberOfLines={1}>{value}</Text>
-          </View>
+        <View className="px-4 mt-2">
+          <Pressable
+            onPress={() => gotoParent('NewBooking')}
+            className="bg-primary rounded-2xl p-4 flex-row items-center active:opacity-90"
+            style={{ shadowColor: '#00008B', shadowOpacity: 0.25, shadowRadius: 14, shadowOffset: { width: 0, height: 8 }, elevation: 6 }}
+          >
+            <View className="h-12 w-12 rounded-2xl bg-white/15 items-center justify-center mr-3">
+              <PlusCircle size={22} color="#fff" />
+            </View>
+            <View className="flex-1">
+              <Text className="text-white text-[15px] font-extrabold">Create new booking</Text>
+              <Text className="text-white/80 text-[11px] mt-0.5">Walk-in customer or scheduled pickup</Text>
+            </View>
+            <ChevronRight size={20} color="#fff" />
+          </Pressable>
         </View>
-      </View>
-      <Text style={styles.statusLabel}>{label}</Text>
+      </ScrollView>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#E5ECFF' },
-  scroll: { flex: 1 },
-  content: { padding: 16, paddingBottom: 32 },
-  headerCard: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 16,
-  },
-  headerLeft: { flex: 2 },
-  headerRight: { flex: 1, alignItems: 'flex-end', justifyContent: 'center' },
-  shopName: { fontSize: 16, fontWeight: '700', color: '#111827' },
-  owner: { fontSize: 14, color: '#111827', marginTop: 2 },
-  caption: { fontSize: 11, color: '#4B5563', marginTop: 4 },
-  headerMetricLabel: { fontSize: 11, color: '#6B7280' },
-  headerMetricValue: { fontSize: 16, fontWeight: '700', color: '#16A34A', marginTop: 4 },
-  sectionTitle: { fontSize: 14, fontWeight: '700', color: '#111827', marginTop: 12, marginBottom: 8 },
-  quickGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  quickTile: {
-    width: '31%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    marginBottom: 8,
-    alignItems: 'center',
-  },
-  quickLabel: {
-    fontSize: 11,
-    color: '#111827',
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  statusGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  statusTile: {
-    width: '31%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    marginBottom: 8,
-    alignItems: 'center',
-  },
-  radialWrap: {
-    width: RADIAL_SIZE,
-    height: RADIAL_SIZE,
-    marginBottom: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radialOuter: {
-    width: RADIAL_SIZE,
-    height: RADIAL_SIZE,
-    borderRadius: RADIAL_SIZE / 2,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.35,
-        shadowRadius: 4,
-      },
-      android: { elevation: 4 },
-    }),
-  },
-  radialRing: {
-    position: 'absolute',
-    width: RADIAL_SIZE,
-    height: RADIAL_SIZE,
-    borderRadius: RADIAL_SIZE / 2,
-    opacity: 0.92,
-  },
-  radialGloss: {
-    position: 'absolute',
-    width: RADIAL_SIZE - 2,
-    height: RADIAL_SIZE / 2,
-    top: 1,
-    borderTopLeftRadius: RADIAL_SIZE / 2,
-    borderTopRightRadius: RADIAL_SIZE / 2,
-    backgroundColor: 'rgba(255,255,255,0.35)',
-  },
-  radialInner: {
-    width: RADIAL_INNER,
-    height: RADIAL_INNER,
-    borderRadius: RADIAL_INNER / 2,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radialValue: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  statusLabel: { fontSize: 11, color: '#4B5563', textAlign: 'center', paddingHorizontal: 2 },
-  errorText: { fontSize: 13, color: '#DC2626', marginVertical: 12 },
-});
-

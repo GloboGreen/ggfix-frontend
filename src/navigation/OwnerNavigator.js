@@ -1,7 +1,8 @@
 import React from 'react';
+import { View } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Ionicons } from '@expo/vector-icons';
+import { LayoutGrid, FileText, Receipt, ShoppingBag, UserCircle } from 'lucide-react-native';
 import colors from '../theme/colors';
 import BackButton from '../components/BackButton';
 import DashboardScreen from '../screens/owner/DashboardScreen';
@@ -45,39 +46,73 @@ import OwnerEmployeeWorkingRecordScreen from '../screens/owner/OwnerEmployeeWork
 import OwnerEmployeeAddAdvanceScreen from '../screens/owner/OwnerEmployeeAddAdvanceScreen';
 import OwnerEmployeeApplyLeaveScreen from '../screens/owner/OwnerEmployeeApplyLeaveScreen';
 import OwnerQrCodeScreen from '../screens/owner/OwnerQrCodeScreen';
-import NewBookingScreen from '../screens/owner/NewBookingScreen';
-import CustomerDetailsScreen from '../screens/owner/CustomerDetailsScreen';
-import ChooseDeviceScreen from '../screens/owner/ChooseDeviceScreen';
-import SelectDeviceBrandScreen from '../screens/owner/SelectDeviceBrandScreen';
-import SelectDeviceModelScreen from '../screens/owner/SelectDeviceModelScreen';
-import DeviceColorStorageScreen from '../screens/owner/DeviceColorStorageScreen';
-import DeviceServicesScreen from '../screens/owner/DeviceServicesScreen';
-import ServiceBookingDevicesListScreen from '../screens/owner/ServiceBookingDevicesListScreen';
+import NewBookingScreen from '../screens/owner/serviceBooking/NewBookingScreen';
+import CustomerDetailsScreen from '../screens/owner/serviceBooking/CustomerDetailsScreen';
+import ChooseDeviceScreen from '../screens/owner/serviceBooking/ChooseDeviceScreen';
+import SelectDeviceBrandScreen from '../screens/owner/serviceBooking/SelectDeviceBrandScreen';
+import SelectDeviceModelScreen from '../screens/owner/serviceBooking/SelectDeviceModelScreen';
+import DeviceColorStorageScreen from '../screens/owner/serviceBooking/DeviceColorStorageScreen';
+import DeviceServicesScreen from '../screens/owner/serviceBooking/DeviceServicesScreen';
+import ServicePriceEstimateScreen from '../screens/owner/serviceBooking/ServicePriceEstimateScreen';
+import NewDeviceInformationScreen from '../screens/owner/serviceBooking/DeviceInformationScreen';
+import NewDeviceSecurityScreen from '../screens/owner/serviceBooking/DeviceSecurityScreen';
+import NewDeviceMissingPartsScreen from '../screens/owner/serviceBooking/DeviceMissingPartsScreen';
+import ServiceBookingDevicesListScreen from '../screens/owner/serviceBooking/ServiceBookingDevicesListScreen';
+import BookingThankYouScreen from '../screens/owner/serviceBooking/BookingThankYouScreen';
+import NewAssignTechnicianScreen from '../screens/owner/serviceBooking/AssignTechnicianScreen';
+import BookingSuccessfulScreen from '../screens/owner/serviceBooking/BookingSuccessfulScreen';
+import ScanQrCodeScreen from '../screens/owner/serviceBooking/ScanQrCodeScreen';
+import BookingStatusScreen from '../screens/owner/serviceBooking/BookingStatusScreen';
 import OwnerLeaveRequestsScreen from '../screens/owner/OwnerLeaveRequestsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
+
+const OWNER_TAB_ICONS = {
+  Home: LayoutGrid,
+  Bookings: FileText,
+  Billing: Receipt,
+  BuySell: ShoppingBag,
+  MyAccount: UserCircle,
+};
 
 function OwnerTabs({ onLogout }) {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarStyle: { backgroundColor: '#282A2D', borderTopColor: '#111827' },
-        tabBarActiveTintColor: '#22C55E',
-        tabBarInactiveTintColor: '#9AA0A6',
-        tabBarIcon: ({ color, size }) => {
-          const name =
-            route.name === 'MyAccount'
-              ? 'person-circle-outline'
-              : route.name === 'Bookings'
-              ? 'file-tray-full-outline'
-              : route.name === 'Billing'
-              ? 'receipt-outline'
-              : route.name === 'BuySell'
-              ? 'bag-handle-outline'
-              : 'grid-outline';
-          return <Ionicons name={name} size={size} color={color} />;
+        tabBarStyle: {
+          backgroundColor: '#FFFFFF',
+          borderTopColor: '#E2E8F0',
+          borderTopWidth: 1,
+          height: 70,
+          paddingBottom: 10,
+          paddingTop: 8,
+          elevation: 12,
+          shadowColor: '#0F172A',
+          shadowOpacity: 0.06,
+          shadowRadius: 12,
+          shadowOffset: { width: 0, height: -4 },
+        },
+        tabBarActiveTintColor: '#00008B',
+        tabBarInactiveTintColor: '#94A3B8',
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '700', marginTop: 2 },
+        tabBarIcon: ({ color, focused }) => {
+          const Icon = OWNER_TAB_ICONS[route.name] || LayoutGrid;
+          return (
+            <View
+              style={{
+                width: 44,
+                height: 30,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 12,
+                backgroundColor: focused ? '#EEF2FF' : 'transparent',
+              }}
+            >
+              <Icon size={20} color={color} strokeWidth={focused ? 2.4 : 2} />
+            </View>
+          );
         },
       })}
     >
@@ -120,16 +155,25 @@ export default function OwnerNavigator({ session, onLogout }) {
       <Stack.Screen name="DeviceColorStorage" component={DeviceColorStorageScreen} options={{ title: 'Device Color & Storage', headerShown: false }} />
       <Stack.Screen name="DeviceServices" component={DeviceServicesScreen} options={{ title: 'Device Services', headerShown: false }} />
       <Stack.Screen name="ServiceBookingDevicesList" component={ServiceBookingDevicesListScreen} options={{ title: 'Service Booking', headerShown: false }} />
+      <Stack.Screen name="ServicePriceEstimate" component={ServicePriceEstimateScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="DeviceInformation" component={NewDeviceInformationScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="DeviceSecurity" component={NewDeviceSecurityScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="DeviceMissingParts" component={NewDeviceMissingPartsScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="BookingThankYou" component={BookingThankYouScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="AssignTechnician" component={NewAssignTechnicianScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="BookingSuccessful" component={BookingSuccessfulScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="ScanQrCode" component={ScanQrCodeScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="BookingStatus" component={BookingStatusScreen} options={{ headerShown: false }} />
       <Stack.Screen name="TicketDetail" component={TicketDetailScreen} options={{ title: 'Booking Details' }} />
       <Stack.Screen name="EditBooking" component={EditBookingScreen} options={{ title: 'Edit Booking' }} />
-      <Stack.Screen name="DeviceInformation" component={DeviceInformationScreen} options={{ title: 'Device Information' }} />
-      <Stack.Screen name="DeviceMissingParts" component={DeviceMissingPartsScreen} options={{ title: 'Device Missing Parts' }} />
-      <Stack.Screen name="DeviceSecurity" component={DeviceSecurityScreen} options={{ title: 'Device Security' }} />
+      <Stack.Screen name="LegacyDeviceInformation" component={DeviceInformationScreen} options={{ title: 'Device Information' }} />
+      <Stack.Screen name="LegacyDeviceMissingParts" component={DeviceMissingPartsScreen} options={{ title: 'Device Missing Parts' }} />
+      <Stack.Screen name="LegacyDeviceSecurity" component={DeviceSecurityScreen} options={{ title: 'Device Security' }} />
       <Stack.Screen name="BookingSummary" component={BookingSummaryScreen} options={{ title: 'Booking Successful' }} />
       <Stack.Screen name="BookingTimeline" component={BookingTimelineScreen} options={{ title: 'History' }} />
       <Stack.Screen name="BarcodePrint" component={BarcodePrintScreen} options={{ title: 'Barcode E-Print' }} />
       <Stack.Screen name="DeliveryInvoice" component={DeliveryInvoiceScreen} options={{ title: 'Deliver Invoice' }} />
-      <Stack.Screen name="AssignTechnician" component={AssignTechnicianScreen} options={{ title: 'Assign Technician' }} />
+      <Stack.Screen name="LegacyAssignTechnician" component={AssignTechnicianScreen} options={{ title: 'Assign Technician' }} />
       <Stack.Screen name="MarketplaceSell" component={MarketplaceSellScreen} options={{ title: 'Sell' }} />
       <Stack.Screen name="Reports" component={ReportsScreen} options={{ title: 'Reports' }} />
       <Stack.Screen name="OwnerPersonalInfo" component={OwnerPersonalInfoScreen} options={{ title: 'My Profile' }} />

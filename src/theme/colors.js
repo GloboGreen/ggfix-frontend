@@ -1,32 +1,39 @@
 /**
- * App theme colors (inspired by light, modern UI: primary blue, light backgrounds).
- * Use for headers, tabs, buttons, and screens.
+ * App theme colors. The `tokens` block holds the canonical palette that's
+ * mirrored in tailwind.config.js — use those in NativeWind className strings:
+ *   <View className="bg-primary" />.
+ * The other named exports are kept for screens that still use StyleSheet.
  */
-export default {
-  // Primary
-  primary: '#5090C1',
-  primaryLight: '#6BA3D1',
-
-  // Backgrounds
-  background: '#F0F4F8',       // pale sky blue (main screen bg)
-  backgroundCard: '#FFFFFF',
-  inputBg: '#F2F5F8',
-
-  // Text
-  text: '#1A1A1A',
-  textSecondary: '#7D7D7D',
-
-  // Header & nav
-  headerBg: '#FFFFFF',
-  headerText: '#1A1A1A',
-  tabBarBg: '#FFFFFF',
-  tabBarActive: '#5090C1',
-  tabBarInactive: '#7D7D7D',
-
-  // Back button (circular pill)
-  backButtonBg: '#F2F5F8',
-  backButtonIcon: '#1A1A1A',
-
-  // Borders & shadows
-  border: '#E5E9ED',
+const tokens = {
+  primary: '#00008B',
+  secondary: '#2563EB',
+  background: '#F8FAFC',
+  card: '#FFFFFF',
+  text: '#0F172A',
+  textMuted: '#64748B',
+  border: '#E2E8F0',
+  success: '#10B981',
+  warning: '#F59E0B',
+  danger: '#EF4444',
+  error: '#EF4444',
 };
+
+export default {
+  // Canonical palette (mirrored in tailwind.config.js)
+  ...tokens,
+
+  // Legacy aliases used by older screens — keep them mapped to the new palette
+  primaryLight: '#1E1EAC',
+  backgroundCard: tokens.card,
+  inputBg: '#F1F5F9',
+  textSecondary: tokens.textMuted,
+  headerBg: '#FFFFFF',
+  headerText: tokens.text,
+  tabBarBg: tokens.card,
+  tabBarActive: tokens.primary,
+  tabBarInactive: tokens.textMuted,
+  backButtonBg: '#F1F5F9',
+  backButtonIcon: tokens.text,
+};
+
+export { tokens };

@@ -7,6 +7,8 @@ const initialState = {
   shopSlug: null,
   roles: [],
   email: null,
+  fullName: null,
+  mobile: null,
 };
 
 const authSlice = createSlice({
@@ -21,6 +23,8 @@ const authSlice = createSlice({
       state.shopSlug = s.shopSlug ?? null;
       state.roles = Array.isArray(s.roles) ? s.roles : [];
       state.email = s.email ?? null;
+      state.fullName = s.fullName ?? null;
+      state.mobile = s.mobile ?? null;
     },
     clearSession() {
       return initialState;

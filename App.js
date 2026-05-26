@@ -1,7 +1,11 @@
+import './global.css';
 import React from 'react';
+import { StatusBar } from 'expo-status-bar';
 import { Provider } from 'react-redux';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
+import { GluestackUIProvider } from '@gluestack-ui/themed';
+import { config } from '@gluestack-ui/config';
 import { store } from './src/store';
 import RootNavigator from './src/navigation/RootNavigator';
 import colors from './src/theme/colors';
@@ -23,11 +27,14 @@ const navTheme = {
 export default function App() {
   return (
     <Provider store={store}>
-      <SafeAreaProvider>
-        <NavigationContainer theme={navTheme}>
-          <RootNavigator />
-        </NavigationContainer>
-      </SafeAreaProvider>
+      <GluestackUIProvider config={config}>
+        <SafeAreaProvider>
+          <StatusBar style="dark" />
+          <NavigationContainer theme={navTheme}>
+            <RootNavigator />
+          </NavigationContainer>
+        </SafeAreaProvider>
+      </GluestackUIProvider>
     </Provider>
   );
 }

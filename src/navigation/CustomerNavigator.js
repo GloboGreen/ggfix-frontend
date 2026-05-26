@@ -1,52 +1,131 @@
 import React from 'react';
+import { View } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Ionicons } from '@expo/vector-icons';
+import { Home as HomeIcon, Tag, ShoppingBag, Wrench, User } from 'lucide-react-native';
 import colors from '../theme/colors';
 import BackButton from '../components/BackButton';
-import CustomerDashboardScreen from '../screens/customer/CustomerDashboardScreen';
-import BookRepairScreen from '../screens/customer/BookRepairScreen';
-import ChooseNearbyShopScreen from '../screens/customer/ChooseNearbyShopScreen';
-import SchedulePickupScreen from '../screens/customer/SchedulePickupScreen';
-import TrackRepairScreen from '../screens/customer/TrackRepairScreen';
-import BuyProductsScreen from '../screens/customer/BuyProductsScreen';
-import PurchaseHistoryScreen from '../screens/customer/PurchaseHistoryScreen';
+
+// Tab root screens
+import HomeScreen from '../screens/customer/HomeScreen';
+import SellHomeScreen from '../screens/customer/sell/SellHomeScreen';
+import BuyHomeScreen from '../screens/customer/buy/BuyHomeScreen';
+import RepairHomeScreen from '../screens/customer/repair/RepairHomeScreen';
+import ProfileScreen from '../screens/customer/profile/ProfileScreen';
+
+// Profile screens
+import EditProfileScreen from '../screens/customer/profile/EditProfileScreen';
+import ManageAddressScreen from '../screens/customer/profile/ManageAddressScreen';
+import AddressFormScreen from '../screens/customer/profile/AddressFormScreen';
+import ManageDeviceScreen from '../screens/customer/profile/ManageDeviceScreen';
+import CustomerSupportScreen from '../screens/customer/profile/CustomerSupportScreen';
+import AboutUsScreen from '../screens/customer/profile/AboutUsScreen';
+import TermsScreen from '../screens/customer/profile/TermsScreen';
+import FaqScreen from '../screens/customer/profile/FaqScreen';
+import MyOrdersScreen from '../screens/customer/profile/MyOrdersScreen';
+import MyCartScreen from '../screens/customer/profile/MyCartScreen';
+import NotificationsScreen from '../screens/customer/profile/NotificationsScreen';
+
+// Device wizard (shared by Profile / Sell / Repair)
+import SelectCategoryScreen from '../screens/customer/device/SelectCategoryScreen';
+import SelectBrandScreen from '../screens/customer/device/SelectBrandScreen';
+import SelectModelScreen from '../screens/customer/device/SelectModelScreen';
+import SelectVariantScreen from '../screens/customer/device/SelectVariantScreen';
+
+// Repair flow
+import RepairSelectDeviceScreen from '../screens/customer/repair/RepairSelectDeviceScreen';
+import RepairSelectServiceScreen from '../screens/customer/repair/RepairSelectServiceScreen';
+import RepairReviewScreen from '../screens/customer/repair/RepairReviewScreen';
+import RepairServiceOptionsScreen from '../screens/customer/repair/RepairServiceOptionsScreen';
+import RepairPickupShopsScreen from '../screens/customer/repair/RepairPickupShopsScreen';
+import RepairShopDetailsScreen from '../screens/customer/repair/RepairShopDetailsScreen';
+import RepairSelectAddressScreen from '../screens/customer/repair/RepairSelectAddressScreen';
+import RepairPickupSlotScreen from '../screens/customer/repair/RepairPickupSlotScreen';
+import RepairCompleteOrderScreen from '../screens/customer/repair/RepairCompleteOrderScreen';
+import RepairConfirmationScreen from '../screens/customer/repair/RepairConfirmationScreen';
+import RepairOrderDetailsScreen from '../screens/customer/repair/RepairOrderDetailsScreen';
+import RepairOrderHistoryScreen from '../screens/customer/repair/RepairOrderHistoryScreen';
+import ShopChatScreen from '../screens/customer/repair/ShopChatScreen';
+
+// Sell flow
+import SellSelectDeviceScreen from '../screens/customer/sell/SellSelectDeviceScreen';
+import SellConditionScreen from '../screens/customer/sell/SellConditionScreen';
+import SellScreeningScreen from '../screens/customer/sell/SellScreeningScreen';
+import SellScreenConditionScreen from '../screens/customer/sell/SellScreenConditionScreen';
+import SellFunctionalScreen from '../screens/customer/sell/SellFunctionalScreen';
+import SellAccessoriesScreen from '../screens/customer/sell/SellAccessoriesScreen';
+import SellImagesScreen from '../screens/customer/sell/SellImagesScreen';
+import SellAddressScreen from '../screens/customer/sell/SellAddressScreen';
+import SellCompleteScreen from '../screens/customer/sell/SellCompleteScreen';
+import SellSuccessScreen from '../screens/customer/sell/SellSuccessScreen';
+import SellQuotationScreen from '../screens/customer/sell/SellQuotationScreen';
+import SellSelectShopScreen from '../screens/customer/sell/SellSelectShopScreen';
+
+// Buy flow
+import BuyCategoryScreen from '../screens/customer/buy/BuyCategoryScreen';
+import BuyListingScreen from '../screens/customer/buy/BuyListingScreen';
+import BuyProductDetailsScreen from '../screens/customer/buy/BuyProductDetailsScreen';
+
+// Shop browse
+import NearbyShopsScreen from '../screens/customer/shop/NearbyShopsScreen';
+import ShopDetailsScreen from '../screens/customer/shop/ShopDetailsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-function CustomerTabs({ onLogout }) {
+const TAB_ICONS = {
+  Home: HomeIcon,
+  Sell: Tag,
+  Buy: ShoppingBag,
+  Repair: Wrench,
+  Profile: User,
+};
+
+function CustomerTabs() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: colors.tabBarBg,
-          borderTopColor: colors.border,
+          backgroundColor: '#FFFFFF',
+          borderTopColor: '#E2E8F0',
           borderTopWidth: 1,
-          elevation: 4,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: -2 },
+          height: 70,
+          paddingBottom: 10,
+          paddingTop: 8,
+          elevation: 12,
+          shadowColor: '#0F172A',
           shadowOpacity: 0.06,
-          shadowRadius: 4,
+          shadowRadius: 12,
+          shadowOffset: { width: 0, height: -4 },
         },
-        tabBarActiveTintColor: colors.tabBarActive,
-        tabBarInactiveTintColor: colors.tabBarInactive,
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '500' },
-        tabBarIcon: ({ color, size }) => {
-          const name =
-            route.name === 'Dashboard' ? 'home-outline'
-              : route.name === 'Track' ? 'navigate-outline'
-              : route.name === 'Buy' ? 'bag-handle-outline'
-              : 'time-outline';
-          return <Ionicons name={name} size={size} color={color} />;
+        tabBarActiveTintColor: '#00008B',
+        tabBarInactiveTintColor: '#94A3B8',
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '700', marginTop: 2 },
+        tabBarIcon: ({ color, size, focused }) => {
+          const Icon = TAB_ICONS[route.name] || HomeIcon;
+          return (
+            <View
+              style={{
+                width: 44,
+                height: 30,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 12,
+                backgroundColor: focused ? '#EEF2FF' : 'transparent',
+              }}
+            >
+              <Icon size={20} color={color} strokeWidth={focused ? 2.4 : 2} />
+            </View>
+          );
         },
       })}
     >
-      <Tab.Screen name="Dashboard" component={CustomerDashboardScreen} initialParams={{ onLogout }} />
-      <Tab.Screen name="Track" component={TrackRepairScreen} />
-      <Tab.Screen name="Buy" component={BuyProductsScreen} />
-      <Tab.Screen name="History" component={PurchaseHistoryScreen} />
+      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Sell" component={SellHomeScreen} />
+      <Tab.Screen name="Buy" component={BuyHomeScreen} />
+      <Tab.Screen name="Repair" component={RepairHomeScreen} />
+      <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
 }
@@ -55,10 +134,12 @@ export default function CustomerNavigator({ session, onLogout }) {
   return (
     <Stack.Navigator
       screenOptions={({ navigation }) => ({
-        headerStyle: { backgroundColor: colors.headerBg },
-        headerShadowVisible: true,
+        headerStyle: { backgroundColor: colors.headerBg, height: 52 },
+        headerShadowVisible: false,
         headerTintColor: colors.headerText,
-        headerTitleStyle: { fontSize: 18, fontWeight: '600', color: colors.headerText },
+        headerTitleStyle: { fontSize: 15, fontWeight: '700', color: colors.headerText },
+        headerTitleAlign: 'center',
+        contentStyle: { backgroundColor: colors.background },
         headerLeft: () => {
           if (!navigation.canGoBack()) return null;
           return <BackButton onPress={() => navigation.goBack()} />;
@@ -67,11 +148,65 @@ export default function CustomerNavigator({ session, onLogout }) {
       })}
     >
       <Stack.Screen name="CustomerTabs" options={{ headerShown: false }}>
-        {(props) => <CustomerTabs {...props} onLogout={onLogout} />}
+        {(props) => <CustomerTabs {...props} session={session} onLogout={onLogout} />}
       </Stack.Screen>
-      <Stack.Screen name="BookRepair" component={BookRepairScreen} options={{ title: 'Book Repair' }} />
-      <Stack.Screen name="ChooseNearbyShop" component={ChooseNearbyShopScreen} options={{ title: 'Choose Shop' }} />
-      <Stack.Screen name="SchedulePickup" component={SchedulePickupScreen} options={{ title: 'Schedule Pickup' }} />
+
+      {/* Profile sub-flows */}
+      <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ title: 'Edit Profile' }} />
+      <Stack.Screen name="ManageAddress" component={ManageAddressScreen} options={{ title: 'Manage Address' }} />
+      <Stack.Screen name="AddressForm" component={AddressFormScreen} options={{ title: 'Add Address' }} />
+      <Stack.Screen name="ManageDevice" component={ManageDeviceScreen} options={{ title: 'Manage My Device' }} />
+      <Stack.Screen name="CustomerSupport" component={CustomerSupportScreen} options={{ title: 'Customer Support' }} />
+      <Stack.Screen name="AboutUs" component={AboutUsScreen} options={{ title: 'About Us' }} />
+      <Stack.Screen name="Terms" component={TermsScreen} options={{ title: 'Terms & Conditions' }} />
+      <Stack.Screen name="Faq" component={FaqScreen} options={{ title: 'FAQ' }} />
+      <Stack.Screen name="MyOrders" component={MyOrdersScreen} options={{ title: 'My Orders' }} />
+      <Stack.Screen name="MyCart" component={MyCartScreen} options={{ title: 'My Cart' }} />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
+
+      {/* Device wizard */}
+      <Stack.Screen name="SelectCategory" component={SelectCategoryScreen} options={{ title: 'Select Device' }} />
+      <Stack.Screen name="SelectBrand" component={SelectBrandScreen} options={{ title: 'Select Brand' }} />
+      <Stack.Screen name="SelectModel" component={SelectModelScreen} options={{ title: 'Select Model' }} />
+      <Stack.Screen name="SelectVariant" component={SelectVariantScreen} options={{ title: 'Your Device' }} />
+
+      {/* Repair flow */}
+      <Stack.Screen name="RepairSelectDevice" component={RepairSelectDeviceScreen} options={{ title: 'Select Device' }} />
+      <Stack.Screen name="RepairSelectService" component={RepairSelectServiceScreen} options={{ title: 'Select Repair Service' }} />
+      <Stack.Screen name="RepairReview" component={RepairReviewScreen} options={{ title: 'Review Report' }} />
+      <Stack.Screen name="RepairServiceOptions" component={RepairServiceOptionsScreen} options={{ title: 'Service Options' }} />
+      <Stack.Screen name="RepairPickupShops" component={RepairPickupShopsScreen} options={{ title: 'Pickup Service Shop' }} />
+      <Stack.Screen name="RepairShopDetails" component={RepairShopDetailsScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="RepairSelectAddress" component={RepairSelectAddressScreen} options={{ title: 'Select Address' }} />
+      <Stack.Screen name="RepairPickupSlot" component={RepairPickupSlotScreen} options={{ title: 'Select Pickup Slot' }} />
+      <Stack.Screen name="RepairCompleteOrder" component={RepairCompleteOrderScreen} options={{ title: 'Complete Order' }} />
+      <Stack.Screen name="RepairConfirmation" component={RepairConfirmationScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="RepairOrderDetails" component={RepairOrderDetailsScreen} options={{ title: 'Order Details' }} />
+      <Stack.Screen name="RepairOrderHistory" component={RepairOrderHistoryScreen} options={{ title: 'Pickup Status' }} />
+      <Stack.Screen name="ShopChat" component={ShopChatScreen} options={{ headerShown: false }} />
+
+      {/* Sell flow */}
+      <Stack.Screen name="SellSelectDevice" component={SellSelectDeviceScreen} options={{ title: 'Select Sell Device' }} />
+      <Stack.Screen name="SellCondition" component={SellConditionScreen} options={{ title: 'Your Device' }} />
+      <Stack.Screen name="SellScreening" component={SellScreeningScreen} options={{ title: 'Screening Question' }} />
+      <Stack.Screen name="SellScreenCondition" component={SellScreenConditionScreen} options={{ title: 'Screen' }} />
+      <Stack.Screen name="SellFunctional" component={SellFunctionalScreen} options={{ title: 'Functional' }} />
+      <Stack.Screen name="SellAccessories" component={SellAccessoriesScreen} options={{ title: 'Accessories & Warranty' }} />
+      <Stack.Screen name="SellImages" component={SellImagesScreen} options={{ title: 'Sell Device Images' }} />
+      <Stack.Screen name="SellAddress" component={SellAddressScreen} options={{ title: 'Select Address' }} />
+      <Stack.Screen name="SellComplete" component={SellCompleteScreen} options={{ title: 'Complete Order' }} />
+      <Stack.Screen name="SellSuccess" component={SellSuccessScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="SellQuotation" component={SellQuotationScreen} options={{ title: 'View Quotation Report' }} />
+      <Stack.Screen name="SellSelectShop" component={SellSelectShopScreen} options={{ title: 'Select Sell Shop' }} />
+
+      {/* Buy flow */}
+      <Stack.Screen name="BuyCategory" component={BuyCategoryScreen} options={{ title: 'Smart Phones' }} />
+      <Stack.Screen name="BuyListing" component={BuyListingScreen} options={{ title: 'Listings' }} />
+      <Stack.Screen name="BuyProductDetails" component={BuyProductDetailsScreen} options={{ title: 'Product Details' }} />
+
+      {/* Shop browse */}
+      <Stack.Screen name="NearbyShops" component={NearbyShopsScreen} options={{ title: 'Nearby Shops' }} />
+      <Stack.Screen name="ShopDetails" component={ShopDetailsScreen} options={{ title: 'Shop Details' }} />
     </Stack.Navigator>
   );
 }

@@ -1,0 +1,125 @@
+import React, { useCallback, useState } from 'react';
+import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { Eye, Trash2, ShoppingCart, ShieldCheck, Truck } from 'lucide-react-native';
+import {
+  Card,
+  Loader,
+  EmptyState,
+  BottomActionBar,
+  PriceRow,
+  PriceDivider,
+  Badge,
+} from '../../../components/rnr';
+import { confirm, notify } from '../../../components/confirm';
+import { getCart, removeCartItem } from '../../../api/marketplace';
+
+export default function MyCartScreen({ navigation }) {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    try { setItems(await getCart()); } finally { setLoading(false); }
+  }, []);
+  useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const onRemove = async (id) => {
+    const ok = await confirm({ title: 'Remove', message: 'Remove this item from cart?', confirmText: 'Remove', destructive: true });
+    if (!ok) return;
+    try { await removeCartItem(id); load(); } catch (e) { notify('Error', e.message); }
+  };
+
+  if (loading) return <Loader label="Loading your cart..." />;
+  if (!items.length) {
+    return (
+      <EmptyState
+        icon={<ShoppingCart size={28} color="#00008B" />}
+        title="Your cart is empty"
+        description="Browse our refurbished collection to get started."
+        actionLabel="Start shopping"
+        onAction={() => navigation.navigate('Buy')}
+      />
+    );
+  }
+
+  const subtotal = items.reduce((sum, it) => sum + (Number(it.product?.price) || 0) * (it.quantity || 1), 0);
+  const shipping = 0;
+  const total = subtotal + shipping;
+
+  return (
+    <View className="flex-1 bg-background">
+      <ScrollView className="flex-1" contentContainerStyle={{ padding: 16, paddingBottom: 160 }}>
+        {items.map((it) => {
+          const p = it.product || {};
+          return (
+            <Card key={it.id} className="rounded-2xl mb-3">
+              <View className="flex-row">
+                <View className="h-24 w-20 rounded-xl bg-primary/10 items-center justify-center mr-3">
+                  <Text style={{ fontSize: 28 }}>📱</Text>
+                </View>
+                <View className="flex-1">
+                  <Text className="text-[14px] font-extrabold text-text" numberOfLines={2}>{p.title}</Text>
+                  <View className="flex-row flex-wrap mt-1">
+                    {p.storageLabel ? (
+                      <Badge variant="muted" className="mr-1.5 mb-1">{p.storageLabel}</Badge>
+                    ) : null}
+                    {p.color ? (
+                      <Badge variant="muted" className="mr-1.5 mb-1">{p.color}</Badge>
+                    ) : null}
+                    <Badge variant="softSuccess">Qty {it.quantity || 1}</Badge>
+                  </View>
+                  <Text className="text-[16px] font-extrabold text-primary mt-2">
+                    ₹{(p.price || 0).toLocaleString?.() || p.price}
+                  </Text>
+                </View>
+              </View>
+              <View className="flex-row mt-3 -mx-1 pt-2 border-t border-border">
+                <Pressable
+                  onPress={() => navigation.navigate('BuyProductDetails', { productId: p.id })}
+                  className="flex-1 flex-row items-center justify-center py-2 active:opacity-70"
+                >
+                  <Eye size={14} color="#00008B" />
+                  <Text className="ml-1.5 text-[12px] font-bold text-primary">View</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => onRemove(it.id)}
+                  className="flex-1 flex-row items-center justify-center py-2 active:opacity-70 border-l border-border"
+                >
+                  <Trash2 size={14} color="#EF4444" />
+                  <Text className="ml-1.5 text-[12px] font-bold text-danger">Remove</Text>
+                </Pressable>
+              </View>
+            </Card>
+          );
+        })}
+
+        <Card className="rounded-2xl mb-3">
+          <Text className="text-[14px] font-extrabold text-text mb-2">Order Summary</Text>
+          <PriceRow label={`Subtotal (${items.length} item${items.length > 1 ? 's' : ''})`} value={`₹${subtotal.toLocaleString()}`} />
+          <PriceRow label="Shipping" value={shipping ? `₹${shipping}` : 'FREE'} valueClassName={shipping ? '' : 'text-success font-bold'} />
+          <PriceDivider />
+          <PriceRow label="Total" value={`₹${total.toLocaleString()}`} bold />
+        </Card>
+
+        <View className="flex-row">
+          <View className="flex-1 bg-card border border-border rounded-2xl p-3 mr-2 flex-row items-center">
+            <ShieldCheck size={16} color="#10B981" />
+            <Text className="text-[11px] font-bold text-text ml-2">6-month warranty</Text>
+          </View>
+          <View className="flex-1 bg-card border border-border rounded-2xl p-3 ml-2 flex-row items-center">
+            <Truck size={16} color="#2563EB" />
+            <Text className="text-[11px] font-bold text-text ml-2">Free delivery</Text>
+          </View>
+        </View>
+      </ScrollView>
+
+      <BottomActionBar
+        priceCaption="Total"
+        priceValue={`₹${total.toLocaleString()}`}
+        priceLabel={`${items.length} item${items.length > 1 ? 's' : ''}`}
+        title="Checkout"
+        onPress={() => {}}
+      />
+    </View>
+  );
+}

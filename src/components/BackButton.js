@@ -1,36 +1,27 @@
 import React from 'react';
-import { TouchableOpacity, View, StyleSheet, Platform } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Pressable, View } from 'react-native';
+import { ChevronLeft } from 'lucide-react-native';
 import colors from '../theme/colors';
 
 export default function BackButton({ onPress }) {
   return (
-    <TouchableOpacity
+    <Pressable
       onPress={onPress}
-      style={styles.touch}
-      activeOpacity={0.7}
       hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+      style={({ pressed }) => ({ marginLeft: 6, padding: 2, opacity: pressed ? 0.6 : 1 })}
     >
-      <View style={styles.circle}>
-        <Ionicons name="chevron-back" size={22} color={colors.backButtonIcon} />
+      <View
+        style={{
+          width: 32,
+          height: 32,
+          borderRadius: 16,
+          backgroundColor: '#F1F5F9',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <ChevronLeft size={18} color={colors.text} />
       </View>
-    </TouchableOpacity>
+    </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
-  touch: {
-    marginLeft: Platform.OS === 'ios' ? 8 : 4,
-    padding: 4,
-  },
-  circle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.backButtonBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-});

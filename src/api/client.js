@@ -8,6 +8,7 @@ import {
   MARKETPLACE_BASE,
   PICKUP_BASE,
   ORDER_BASE,
+  USER_BASE,
 } from './config';
 import { getToken } from '../auth/session';
 
@@ -84,3 +85,4 @@ export const inventoryApi = createClient(INVENTORY_BASE);
 export const marketplaceApi = createClient(MARKETPLACE_BASE);
 export const pickupApi = createClient(PICKUP_BASE);
 export const orderApi = createClient(ORDER_BASE);
+export const userApi = createClient(USER_BASE);
