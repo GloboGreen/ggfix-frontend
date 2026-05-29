@@ -20,6 +20,7 @@ import {
   Bell,
   ChevronRight,
   ShieldCheck,
+  ClipboardList,
 } from 'lucide-react-native';
 import { ticketApi } from '../../api/client';
 import { Loader, SectionHeader, Badge } from '../../components/rnr';
@@ -100,27 +101,27 @@ export default function DashboardScreen({ navigation }) {
           colors={['#00008B', '#1E1EAC', '#2563EB']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={{ paddingTop: 12, paddingBottom: 40, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 }}
+          style={{ paddingTop: 8, paddingBottom: 12, borderBottomLeftRadius: 22, borderBottomRightRadius: 22 }}
         >
           <View className="px-4 flex-row items-center">
-            <View className="h-11 w-11 rounded-2xl bg-white/15 items-center justify-center mr-3">
-              <Wrench size={20} color="#fff" />
+            <View className="h-10 w-10 rounded-2xl bg-white/15 items-center justify-center mr-2.5">
+              <Wrench size={18} color="#fff" />
             </View>
             <View className="flex-1">
-              <Text className="text-white/75 text-[11px]">Good day</Text>
-              <Text className="text-white text-[18px] font-extrabold">Shop · Owner</Text>
+              <Text className="text-white/75 text-[10px]">Good day</Text>
+              <Text className="text-white text-[16px] font-extrabold leading-5">Shop · Owner</Text>
               <View className="flex-row items-center mt-0.5">
-                <ShieldCheck size={11} color="#A7F3D0" />
-                <Text className="text-emerald-200 text-[10px] font-bold ml-1">VERIFIED SHOP OWNER</Text>
+                <ShieldCheck size={10} color="#A7F3D0" />
+                <Text className="text-emerald-200 text-[9px] font-bold ml-1 tracking-wide">VERIFIED SHOP OWNER</Text>
               </View>
             </View>
-            <Pressable className="h-10 w-10 rounded-full bg-white/15 items-center justify-center active:opacity-80">
-              <Bell size={18} color="#fff" />
+            <Pressable className="h-9 w-9 rounded-full bg-white/15 items-center justify-center active:opacity-80">
+              <Bell size={16} color="#fff" />
             </Pressable>
           </View>
 
-          <View className="px-4 mt-4">
-            <Text className="text-white/80 text-[12px]">Today at a glance</Text>
+          <View className="px-4 mt-2">
+            <Text className="text-white/80 text-[11px]">Today at a glance</Text>
           </View>
         </LinearGradient>
       </SafeAreaView>
@@ -128,33 +129,33 @@ export default function DashboardScreen({ navigation }) {
       <ScrollView
         className="flex-1"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 32 }}
+        contentContainerStyle={{ paddingBottom: 28 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00008B" />}
       >
-        {/* KPI strip */}
-        <View className="mx-4 -mt-7 bg-card border border-border rounded-3xl p-4 flex-row"
-              style={{ shadowColor: '#0F172A', shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 8 }}>
+        {/* KPI strip — sits cleanly below the header, no negative-margin clipping */}
+        <View className="mx-4 mt-3 bg-card border border-border rounded-2xl p-3 flex-row"
+              style={{ shadowColor: '#0F172A', shadowOpacity: 0.08, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 4 }}>
           <View className="flex-1 px-1">
-            <Text className="text-[10px] font-bold text-text-muted tracking-widest">TOTAL BOOKINGS</Text>
-            <Text className="text-[26px] font-extrabold text-primary mt-1">{total}</Text>
-            <View className="flex-row items-center mt-0.5">
-              <TrendingUp size={11} color="#10B981" />
-              <Text className="text-[10px] font-bold text-success ml-1">All-time</Text>
+            <Text className="text-[9px] font-bold text-text-muted tracking-widest">BOOKINGS</Text>
+            <Text className="text-[20px] font-extrabold text-primary mt-0.5 leading-6">{total}</Text>
+            <View className="flex-row items-center">
+              <TrendingUp size={9} color="#10B981" />
+              <Text className="text-[9px] font-bold text-success ml-0.5">All-time</Text>
             </View>
           </View>
-          <View className="w-px bg-border mx-1" />
+          <View className="w-px bg-border my-1" />
           <View className="flex-1 px-1">
-            <Text className="text-[10px] font-bold text-text-muted tracking-widest">ACTIVE</Text>
-            <Text className="text-[26px] font-extrabold text-secondary mt-1">
+            <Text className="text-[9px] font-bold text-text-muted tracking-widest">ACTIVE</Text>
+            <Text className="text-[20px] font-extrabold text-secondary mt-0.5 leading-6">
               {(summary?.serviceAccepted || 0) + (summary?.technicianAssigned || 0) + (summary?.inServiceProcess || 0)}
             </Text>
-            <Text className="text-[10px] font-bold text-text-muted mt-0.5">in pipeline</Text>
+            <Text className="text-[9px] font-bold text-text-muted">in pipeline</Text>
           </View>
-          <View className="w-px bg-border mx-1" />
+          <View className="w-px bg-border my-1" />
           <View className="flex-1 px-1">
-            <Text className="text-[10px] font-bold text-text-muted tracking-widest">DELIVERED</Text>
-            <Text className="text-[26px] font-extrabold text-success mt-1">{summary?.delivered || 0}</Text>
-            <Text className="text-[10px] font-bold text-text-muted mt-0.5">closed jobs</Text>
+            <Text className="text-[9px] font-bold text-text-muted tracking-widest">DELIVERED</Text>
+            <Text className="text-[20px] font-extrabold text-success mt-0.5 leading-6">{summary?.delivered || 0}</Text>
+            <Text className="text-[9px] font-bold text-text-muted">closed jobs</Text>
           </View>
         </View>
 
@@ -162,6 +163,8 @@ export default function DashboardScreen({ navigation }) {
         <View className="px-3 flex-row flex-wrap">
           {[
             { key: 'NewBooking',   label: 'New Booking',      icon: PlusCircle, color: '#00008B', bg: '#EEF2FF', via: 'parent' },
+            // 'Bookings' is a sibling TAB (not a Stack route), so navigate at tab level — no `via: parent`.
+            { key: 'Bookings',     label: 'All Bookings',     icon: ClipboardList, color: '#0EA5E9', bg: '#E0F2FE' },
             { key: 'Billing',      label: 'Billing & Delivery', icon: Receipt,  color: '#2563EB', bg: '#DBEAFE' },
             { key: 'Reports',      label: 'Sales Report',      icon: BarChart3, color: '#10B981', bg: '#D1FAE5' },
             { key: '_enquiry',     label: 'Enquiry',           icon: HelpCircle, color: '#F59E0B', bg: '#FEF3C7' },
@@ -170,16 +173,16 @@ export default function DashboardScreen({ navigation }) {
           ].map((t) => {
             const Icon = t.icon;
             return (
-              <View key={t.label} style={{ width: '33.333%' }} className="p-1.5">
+              <View key={t.label} style={{ width: '33.333%' }} className="p-1">
                 <Pressable
                   onPress={() => { if (t.via === 'parent') gotoParent(t.key); else navigation.navigate(t.key); }}
-                  className="bg-card border border-border rounded-2xl p-3 items-center active:opacity-80"
+                  className="bg-card border border-border rounded-xl px-2 py-2.5 items-center active:opacity-80"
                   style={{ shadowColor: '#0F172A', shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 1 }}
                 >
-                  <View className="h-11 w-11 rounded-2xl items-center justify-center mb-2" style={{ backgroundColor: t.bg }}>
-                    <Icon size={20} color={t.color} />
+                  <View className="h-9 w-9 rounded-xl items-center justify-center mb-1.5" style={{ backgroundColor: t.bg }}>
+                    <Icon size={16} color={t.color} />
                   </View>
-                  <Text className="text-[11px] font-extrabold text-text text-center" numberOfLines={2}>{t.label}</Text>
+                  <Text className="text-[10px] font-extrabold text-text text-center" numberOfLines={2}>{t.label}</Text>
                 </Pressable>
               </View>
             );
@@ -198,18 +201,18 @@ export default function DashboardScreen({ navigation }) {
               const value = summary?.[s.key] ?? 0;
               const isHot = value > 0;
               return (
-                <View key={s.key} style={{ width: '50%' }} className="p-1.5">
+                <View key={s.key} style={{ width: '50%' }} className="p-1">
                   <Pressable
                     onPress={() => gotoParent('Bookings')}
-                    className="bg-card border border-border rounded-2xl p-3 flex-row items-center active:opacity-80"
+                    className="bg-card border border-border rounded-xl p-2.5 flex-row items-center active:opacity-80"
                     style={{ shadowColor: '#0F172A', shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 1 }}
                   >
-                    <View className={`h-11 w-11 rounded-2xl items-center justify-center mr-3 ${s.bg}`}>
-                      <Icon size={20} color={s.color} />
+                    <View className={`h-9 w-9 rounded-xl items-center justify-center mr-2 ${s.bg}`}>
+                      <Icon size={16} color={s.color} />
                     </View>
                     <View className="flex-1">
-                      <Text className={`text-[20px] font-extrabold ${s.text}`}>{value}</Text>
-                      <Text className="text-[11px] text-text-muted leading-tight" numberOfLines={2}>{s.label.replace('\n', ' ')}</Text>
+                      <Text className={`text-[17px] font-extrabold leading-5 ${s.text}`}>{value}</Text>
+                      <Text className="text-[10px] text-text-muted leading-tight" numberOfLines={2}>{s.label.replace('\n', ' ')}</Text>
                     </View>
                     {isHot ? <Badge variant={value > 3 ? 'softDanger' : 'softWarning'}>{value > 3 ? 'HOT' : 'NEW'}</Badge> : null}
                   </Pressable>
@@ -219,20 +222,20 @@ export default function DashboardScreen({ navigation }) {
           </View>
         )}
 
-        <View className="px-4 mt-2">
+        <View className="px-4 mt-3">
           <Pressable
             onPress={() => gotoParent('NewBooking')}
-            className="bg-primary rounded-2xl p-4 flex-row items-center active:opacity-90"
-            style={{ shadowColor: '#00008B', shadowOpacity: 0.25, shadowRadius: 14, shadowOffset: { width: 0, height: 8 }, elevation: 6 }}
+            className="bg-primary rounded-xl p-3 flex-row items-center active:opacity-90"
+            style={{ shadowColor: '#00008B', shadowOpacity: 0.2, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 4 }}
           >
-            <View className="h-12 w-12 rounded-2xl bg-white/15 items-center justify-center mr-3">
-              <PlusCircle size={22} color="#fff" />
+            <View className="h-10 w-10 rounded-xl bg-white/15 items-center justify-center mr-2.5">
+              <PlusCircle size={18} color="#fff" />
             </View>
             <View className="flex-1">
-              <Text className="text-white text-[15px] font-extrabold">Create new booking</Text>
-              <Text className="text-white/80 text-[11px] mt-0.5">Walk-in customer or scheduled pickup</Text>
+              <Text className="text-white text-[13px] font-extrabold">Create new booking</Text>
+              <Text className="text-white/80 text-[10px] mt-0.5">Walk-in customer or scheduled pickup</Text>
             </View>
-            <ChevronRight size={20} color="#fff" />
+            <ChevronRight size={16} color="#fff" />
           </Pressable>
         </View>
       </ScrollView>

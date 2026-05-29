@@ -21,5 +21,6 @@ export { Loader } from './Loader';
 export { StatTile } from './StatTile';
 export { PriceRow, PriceDivider } from './PriceRow';
 export { StepIndicator } from './StepIndicator';
+export { SelectionCrumb } from './SelectionCrumb';
 export { Chip } from './Chip';
 export { cn } from './cn';

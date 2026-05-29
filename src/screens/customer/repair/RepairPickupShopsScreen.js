@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { PanResponder, Pressable, ScrollView, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   Store,
@@ -7,20 +7,23 @@ import {
   MapPin,
   Truck,
   ShieldCheck,
-  Filter,
   Award,
   Clock,
   Sparkles,
+  Crosshair,
+  RefreshCw,
+  Locate,
 } from 'lucide-react-native';
 import {
   Loader,
   EmptyState,
   ShopCard,
   SearchBar,
-  Chip,
   Badge,
 } from '../../../components/rnr';
 import { listNearbyShops } from '../../../api/shops';
+import { useCustomerLocation } from '../../../hooks/useCustomerLocation';
+import { travelTimesFor } from '../../../utils/travelTimes';
 
 const SORTS = [
   { key: 'recommended', label: 'Recommended', icon: Sparkles },
@@ -29,42 +32,129 @@ const SORTS = [
   { key: 'eta',         label: 'Fastest',    icon: Clock },
 ];
 
+// Doorstep pickup radius is chosen on a slider from MIN_RADIUS_KM up to MAX_RADIUS_KM.
+const MIN_RADIUS_KM = 1;
+const MAX_RADIUS_KM = 50;
+
+// Lightweight single-value slider (no extra dependency). Tap or drag the track
+// to pick a radius. Works on web, iOS and Android via PanResponder.
+function RadiusSlider({ min, max, value, onChange }) {
+  const widthRef = useRef(0);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const pct = max > min ? Math.max(0, Math.min(1, (value - min) / (max - min))) : 0;
+
+  const pan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (e) => moveTo(e.nativeEvent.locationX),
+      onPanResponderMove: (e) => moveTo(e.nativeEvent.locationX),
+    }),
+  ).current;
+
+  function moveTo(x) {
+    const w = widthRef.current;
+    if (w <= 0) return;
+    const ratio = Math.max(0, Math.min(1, x / w));
+    onChangeRef.current(Math.round(min + ratio * (max - min)));
+  }
+
+  return (
+    <View
+      onLayout={(e) => { widthRef.current = e.nativeEvent.layout.width; }}
+      {...pan.panHandlers}
+      style={{ height: 34, justifyContent: 'center' }}
+    >
+      <View style={{ height: 6, borderRadius: 3, backgroundColor: '#E2E8F0' }} />
+      <View style={{ position: 'absolute', left: 0, height: 6, borderRadius: 3, backgroundColor: '#00008B', width: `${pct * 100}%` }} />
+      <View
+        style={{
+          position: 'absolute',
+          left: `${pct * 100}%`,
+          marginLeft: -11,
+          height: 22,
+          width: 22,
+          borderRadius: 11,
+          backgroundColor: '#FFFFFF',
+          borderWidth: 3,
+          borderColor: '#00008B',
+          shadowColor: '#0F172A',
+          shadowOpacity: 0.2,
+          shadowRadius: 3,
+          shadowOffset: { width: 0, height: 1 },
+          elevation: 3,
+        }}
+      />
+    </View>
+  );
+}
+
 export default function RepairPickupShopsScreen({ navigation, route }) {
   const params = route.params || {};
+
+  const { lat, lng, source, loading: locLoading, error: locError, addressLabel, refresh: refreshLoc } = useCustomerLocation();
+
+  const [radiusKm, setRadiusKm] = useState(20);
   const [shops, setShops] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [shopError, setShopError] = useState(null);
   const [sort, setSort] = useState('recommended');
   const [q, setQ] = useState('');
+  // True when we widened the bubble because the user's bubble was empty.
+  // Used to render a banner explaining "no shops within X km, showing nearest instead".
+  const [autoExpanded, setAutoExpanded] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      try { setShops(await listNearbyShops()); } catch (_) {}
+  // (Re)fetch whenever location resolves or radius changes.
+  // Strict radius â€” empty state ("No shops within X km") rather than
+  // silently widening the search and showing shops 150 km away.
+  const fetchShops = useCallback(async () => {
+    setLoading(true);
+    setShopError(null);
+    setAutoExpanded(false);
+    try {
+      const list = await listNearbyShops({
+        lat: lat ?? undefined,
+        lng: lng ?? undefined,
+        radiusKm: lat != null && lng != null ? radiusKm : undefined,
+      });
+      setShops(list || []);
+    } catch (e) {
+      setShopError(e?.message || 'Could not load shops');
+      setShops([]);
+    } finally {
       setLoading(false);
-    })();
-  }, []);
+    }
+  }, [lat, lng, radiusKm]);
+
+  const useDemoLocation = () => {
+    if (typeof window !== 'undefined') {
+      // Cuddalore â€” matches the seeded demo shops.
+      window.__GGFIX_FORCE_LOCATION = { lat: 11.7480, lng: 79.7714, label: 'Cuddalore (demo)' };
+      refreshLoc();
+    }
+  };
+
+  useEffect(() => { if (!locLoading) fetchShops(); }, [locLoading, fetchShops]);
 
   const filtered = useMemo(() => {
     let list = [...shops];
     if (q.trim()) {
-      const needle = q.toLowerCase();
+      const n = q.toLowerCase();
       list = list.filter((s) =>
-        (s.name || '').toLowerCase().includes(needle) ||
-        (s.address || '').toLowerCase().includes(needle) ||
-        (s.city || '').toLowerCase().includes(needle),
+        (s.name || '').toLowerCase().includes(n) ||
+        (s.address || '').toLowerCase().includes(n) ||
+        (s.city || '').toLowerCase().includes(n),
       );
     }
     if (sort === 'rating') list.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-    else if (sort === 'distance') list.sort((a, b) => (a.distanceKm ?? 999) - (b.distanceKm ?? 999));
-    else if (sort === 'eta') list.sort((a, b) => (a.etaMins ?? 999) - (b.etaMins ?? 999));
+    // ETA is proportional to distance for a fixed travel mode, so "Fastest"
+    // sorts by distance too.
+    else list.sort((a, b) => (a.distanceKm ?? 999) - (b.distanceKm ?? 999));
     return list;
   }, [shops, q, sort]);
 
-  const topRated = useMemo(
-    () => [...shops].filter((s) => (s.rating || 0) >= 4.5).sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 5),
-    [shops],
-  );
-
-  if (loading) return <Loader label="Finding shops near you..." />;
+  const showLoader = locLoading || (loading && shops.length === 0);
 
   return (
     <View className="flex-1 bg-background">
@@ -76,9 +166,22 @@ export default function RepairPickupShopsScreen({ navigation, route }) {
       >
         <Text className="text-white/80 text-[11px] font-bold tracking-widest">PICKUP SHOPS</Text>
         <Text className="text-white text-[22px] font-extrabold mt-1">Choose your repair shop</Text>
-        <Text className="text-white/85 text-[12px] mt-1">
-          {shops.length} verified shop{shops.length === 1 ? '' : 's'} near you · Free doorstep pickup
-        </Text>
+        <View className="flex-row items-center mt-1">
+          <Locate size={11} color="#A7F3D0" />
+          <Text className="text-white/85 text-[12px] ml-1.5 flex-1" numberOfLines={1}>
+            {lat != null && lng != null
+              ? `Near ${addressLabel || 'you'} · within ${radiusKm} km`
+              : (locError ? `Location: ${locError}` : 'Resolving your location…')}
+          </Text>
+          {source !== 'override' ? (
+            <Pressable
+              onPress={useDemoLocation}
+              className="bg-white/15 rounded-full px-2 py-0.5 ml-2 active:opacity-70"
+            >
+              <Text className="text-white text-[10px] font-bold">Use demo</Text>
+            </Pressable>
+          ) : null}
+        </View>
       </LinearGradient>
 
       <View className="px-4 -mt-6">
@@ -91,25 +194,93 @@ export default function RepairPickupShopsScreen({ navigation, route }) {
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
+        {/* Location warning */}
+        {!locLoading && (lat == null || lng == null) ? (
+          <View className="bg-warning/10 border border-warning/30 rounded-xl mx-4 mt-3 p-2.5 flex-row items-start">
+            <Crosshair size={14} color="#F59E0B" style={{ marginTop: 2 }} />
+            <View className="flex-1 ml-2">
+              <Text className="text-[12px] font-extrabold text-text">Set a pickup location</Text>
+              <Text className="text-[11px] text-text-muted mt-0.5 leading-4">
+                We're showing all shops. Save a default address (with location) for distance-sorted results.
+              </Text>
+            </View>
+            <Pressable
+              onPress={refreshLoc}
+              className="bg-warning/15 rounded-full px-2.5 py-1 flex-row items-center active:opacity-70 ml-1"
+            >
+              <RefreshCw size={11} color="#F59E0B" />
+              <Text className="text-warning text-[10px] font-bold ml-1">Retry</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {/* Auto-expand banner: shown when first-pass with radius returned 0 shops
+            and we fell back to "show nearest regardless of distance" */}
+        {autoExpanded && shops.length > 0 ? (
+          <View className="bg-warning/10 border border-warning/30 rounded-xl mx-4 mt-3 p-2.5 flex-row items-start">
+            <Sparkles size={14} color="#F59E0B" style={{ marginTop: 2 }} />
+            <View className="flex-1 ml-2">
+              <Text className="text-[12px] font-extrabold text-text">No shops within {radiusKm} km</Text>
+              <Text className="text-[11px] text-text-muted mt-0.5 leading-4">
+                Showing the nearest shops instead. The closest is {shops[0]?.distanceKm != null ? `${shops[0].distanceKm.toFixed(1)} km` : 'farther than expected'} away.
+              </Text>
+            </View>
+            <Pressable
+              onPress={useDemoLocation}
+              className="bg-warning rounded-full px-2.5 py-1 active:opacity-70 ml-1"
+            >
+              <Text className="text-white text-[10px] font-bold">Use demo loc</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {/* Radius selector — continuous slider from MIN to MAX km */}
+        {lat != null && lng != null ? (
+          <View className="px-4 pt-3">
+            <View
+              className="bg-card border border-border rounded-2xl px-4 pt-3 pb-2.5"
+              style={{ shadowColor: '#0F172A', shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 1 }}
+            >
+              <View className="flex-row items-center justify-between mb-0.5">
+                <Text className="text-[10px] font-extrabold text-text-muted tracking-widest">SEARCH RADIUS</Text>
+                <View className="bg-primary/10 rounded-full px-2.5 py-0.5">
+                  <Text className="text-[12px] font-extrabold text-primary">{radiusKm} km</Text>
+                </View>
+              </View>
+              <RadiusSlider min={MIN_RADIUS_KM} max={MAX_RADIUS_KM} value={radiusKm} onChange={setRadiusKm} />
+              <View className="flex-row items-center justify-between">
+                <Text className="text-[10px] text-text-muted">{MIN_RADIUS_KM} km</Text>
+                <Text className="text-[10px] text-text-muted">{MAX_RADIUS_KM} km</Text>
+              </View>
+            </View>
+          </View>
+        ) : null}
 
         {/* Trust strip */}
-        <View className="flex-row px-4 mt-4">
-          <View className="flex-1 mr-2 bg-card border border-border rounded-2xl py-2.5 items-center">
-            <Truck size={16} color="#00008B" />
-            <Text className="text-[10px] font-bold text-text mt-1">Free Pickup</Text>
-          </View>
-          <View className="flex-1 mx-1 bg-card border border-border rounded-2xl py-2.5 items-center">
-            <ShieldCheck size={16} color="#10B981" />
-            <Text className="text-[10px] font-bold text-text mt-1">30-day Warranty</Text>
-          </View>
-          <View className="flex-1 ml-2 bg-card border border-border rounded-2xl py-2.5 items-center">
-            <Award size={16} color="#F59E0B" />
-            <Text className="text-[10px] font-bold text-text mt-1">Verified Shops</Text>
+        <View className="px-4 mt-3">
+          <View
+            className="flex-row bg-card border border-border rounded-2xl py-2.5"
+            style={{ shadowColor: '#0F172A', shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 1 }}
+          >
+            <View className="flex-1 items-center px-1">
+              <Truck size={15} color="#00008B" />
+              <Text className="text-[10px] font-bold text-text mt-1 text-center">Free Pickup</Text>
+            </View>
+            <View className="w-px bg-border my-1" />
+            <View className="flex-1 items-center px-1">
+              <ShieldCheck size={15} color="#10B981" />
+              <Text className="text-[10px] font-bold text-text mt-1 text-center">30-day Warranty</Text>
+            </View>
+            <View className="w-px bg-border my-1" />
+            <View className="flex-1 items-center px-1">
+              <Award size={15} color="#F59E0B" />
+              <Text className="text-[10px] font-bold text-text mt-1 text-center">Verified Shops</Text>
+            </View>
           </View>
         </View>
 
         {/* Sort chips */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 12, paddingTop: 14 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 12, paddingTop: 10 }}>
           {SORTS.map((s) => {
             const SIcon = s.icon;
             const active = sort === s.key;
@@ -117,68 +288,44 @@ export default function RepairPickupShopsScreen({ navigation, route }) {
               <Pressable
                 key={s.key}
                 onPress={() => setSort(s.key)}
-                className={`flex-row items-center rounded-full border px-3.5 py-2 mr-2 mb-2 ${active ? 'bg-primary border-primary' : 'bg-card border-border'}`}
+                className={`flex-row items-center rounded-full border px-3 py-1.5 mr-2 mb-1 ${active ? 'bg-primary border-primary' : 'bg-card border-border'}`}
               >
-                <SIcon size={12} color={active ? '#fff' : '#0F172A'} />
-                <Text className={`text-[12px] font-bold ml-1.5 ${active ? 'text-white' : 'text-text'}`}>{s.label}</Text>
+                <SIcon size={11} color={active ? '#fff' : '#0F172A'} />
+                <Text className={`text-[11px] font-bold ml-1 ${active ? 'text-white' : 'text-text'}`}>{s.label}</Text>
               </Pressable>
             );
           })}
         </ScrollView>
 
-        {/* Top rated horizontal rail */}
-        {!q && topRated.length > 0 && sort === 'recommended' ? (
-          <>
-            <View className="flex-row items-center px-4 mt-2 mb-2">
-              <Award size={14} color="#F59E0B" />
-              <Text className="text-[11px] font-extrabold text-warning ml-1.5 tracking-widest">TOP RATED NEAR YOU</Text>
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 12 }}>
-              {topRated.map((s) => (
-                <Pressable
-                  key={s.id}
-                  onPress={() => navigation.navigate('RepairShopDetails', { ...params, shopId: s.id })}
-                  className="bg-card border border-border rounded-2xl p-3 mx-1.5 active:opacity-80"
-                  style={{ width: 200, shadowColor: '#0F172A', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 3 }}
-                >
-                  <View className="flex-row items-center mb-2">
-                    <View className="h-10 w-10 rounded-xl bg-primary/10 items-center justify-center mr-2">
-                      <Text className="text-primary text-[14px] font-extrabold">{(s.name || '?').slice(0, 1).toUpperCase()}</Text>
-                    </View>
-                    <Badge variant="softSuccess">OPEN</Badge>
-                  </View>
-                  <Text className="text-[13px] font-extrabold text-text" numberOfLines={1}>{s.name}</Text>
-                  <Text className="text-[10px] text-text-muted mt-0.5" numberOfLines={1}>{s.address || s.city}</Text>
-                  <View className="flex-row items-center mt-2 flex-wrap">
-                    <View className="flex-row items-center bg-success/10 rounded-full px-2 py-0.5 mr-1.5">
-                      <Star size={10} color="#10B981" fill="#10B981" />
-                      <Text className="text-[10px] font-bold text-success ml-0.5">{Number(s.rating || 4.5).toFixed(1)}</Text>
-                    </View>
-                    {s.distanceKm != null ? (
-                      <Text className="text-[10px] text-text-muted">{s.distanceKm.toFixed(1)} km</Text>
-                    ) : null}
-                  </View>
-                </Pressable>
-              ))}
-            </ScrollView>
-          </>
-        ) : null}
-
-        {/* All shops */}
-        <View className="flex-row items-center px-4 mt-4 mb-2">
-          <Store size={14} color="#0F172A" />
-          <Text className="text-[11px] font-extrabold text-text-muted ml-1.5 tracking-widest">
-            {q ? `RESULTS (${filtered.length})` : `ALL SHOPS (${filtered.length})`}
+        {/* Result count */}
+        <View className="flex-row items-center justify-between px-4 mt-2 mb-2">
+          <Text className="text-[10px] font-extrabold text-text-muted tracking-widest">
+            {q ? `RESULTS (${filtered.length})` : `${filtered.length} SHOP${filtered.length === 1 ? '' : 'S'}${lat != null ? ` WITHIN ${radiusKm} KM` : ''}`}
           </Text>
+          {source ? (
+            <View className="flex-row items-center">
+              <Locate size={10} color="#10B981" />
+              <Text className="text-[10px] text-success font-bold ml-1">
+                {source === 'address' ? addressLabel : 'Live location'}
+              </Text>
+            </View>
+          ) : null}
         </View>
+
         <View className="px-4">
-          {!filtered.length ? (
+          {showLoader ? (
+            <Loader label="Finding shops near you..." />
+          ) : shopError ? (
+            <View className="bg-danger/10 border border-danger/30 rounded-xl p-3">
+              <Text className="text-[12px] text-danger">{shopError}</Text>
+            </View>
+          ) : !filtered.length ? (
             <EmptyState
               icon={<Store size={28} color="#00008B" />}
-              title="No shops match"
-              description={q ? 'Try a different search.' : 'No shops near your saved address yet.'}
-              actionLabel={q ? 'Clear search' : null}
-              onAction={() => setQ('')}
+              title={lat != null ? `No shops within ${radiusKm} km` : 'No shops match'}
+              description={lat != null ? 'Try expanding the search radius above.' : (q ? 'Try a different search.' : 'No shops near your saved address yet.')}
+              actionLabel={q ? 'Clear search' : (lat != null && radiusKm < MAX_RADIUS_KM ? `Expand to ${MAX_RADIUS_KM} km` : null)}
+              onAction={() => { if (q) setQ(''); else setRadiusKm(MAX_RADIUS_KM); }}
             />
           ) : (
             filtered.map((s) => (
@@ -189,7 +336,7 @@ export default function RepairPickupShopsScreen({ navigation, route }) {
                   rating={s.rating || 4.5}
                   reviews={s.reviewCount || 100}
                   distance={s.distanceKm != null ? s.distanceKm.toFixed(1) : null}
-                  eta={s.etaMins || 30}
+                  travelTimes={travelTimesFor(s.distanceKm)}
                   open
                   onPress={() => navigation.navigate('RepairShopDetails', { ...params, shopId: s.id })}
                 />
@@ -201,3 +348,4 @@ export default function RepairPickupShopsScreen({ navigation, route }) {
     </View>
   );
 }
+

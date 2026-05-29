@@ -8,6 +8,7 @@ import BackButton from '../components/BackButton';
 
 // Tab root screens
 import HomeScreen from '../screens/customer/HomeScreen';
+import CategoryServiceMenuScreen from '../screens/customer/CategoryServiceMenuScreen';
 import SellHomeScreen from '../screens/customer/sell/SellHomeScreen';
 import BuyHomeScreen from '../screens/customer/buy/BuyHomeScreen';
 import RepairHomeScreen from '../screens/customer/repair/RepairHomeScreen';
@@ -29,10 +30,11 @@ import NotificationsScreen from '../screens/customer/profile/NotificationsScreen
 // Device wizard (shared by Profile / Sell / Repair)
 import SelectCategoryScreen from '../screens/customer/device/SelectCategoryScreen';
 import SelectBrandScreen from '../screens/customer/device/SelectBrandScreen';
+import SelectSeriesScreen from '../screens/customer/device/SelectSeriesScreen';
 import SelectModelScreen from '../screens/customer/device/SelectModelScreen';
 import SelectVariantScreen from '../screens/customer/device/SelectVariantScreen';
 
-// Repair flow
+// Repair flow (Mobile Repair end-to-end wizard lives in repair/)
 import RepairSelectDeviceScreen from '../screens/customer/repair/RepairSelectDeviceScreen';
 import RepairSelectServiceScreen from '../screens/customer/repair/RepairSelectServiceScreen';
 import RepairReviewScreen from '../screens/customer/repair/RepairReviewScreen';
@@ -45,6 +47,9 @@ import RepairCompleteOrderScreen from '../screens/customer/repair/RepairComplete
 import RepairConfirmationScreen from '../screens/customer/repair/RepairConfirmationScreen';
 import RepairOrderDetailsScreen from '../screens/customer/repair/RepairOrderDetailsScreen';
 import RepairOrderHistoryScreen from '../screens/customer/repair/RepairOrderHistoryScreen';
+import RepairPickupStatusScreen from '../screens/customer/repair/RepairPickupStatusScreen';
+import ServiceReceiptScreen from '../screens/customer/repair/ServiceReceiptScreen';
+import InvoiceReceiptScreen from '../screens/customer/repair/InvoiceReceiptScreen';
 import ShopChatScreen from '../screens/customer/repair/ShopChatScreen';
 
 // Sell flow
@@ -53,10 +58,11 @@ import SellConditionScreen from '../screens/customer/sell/SellConditionScreen';
 import SellScreeningScreen from '../screens/customer/sell/SellScreeningScreen';
 import SellScreenConditionScreen from '../screens/customer/sell/SellScreenConditionScreen';
 import SellFunctionalScreen from '../screens/customer/sell/SellFunctionalScreen';
-import SellAccessoriesScreen from '../screens/customer/sell/SellAccessoriesScreen';
+import SellAccessoriesWarrantyScreen from '../screens/customer/sell/SellAccessoriesWarrantyScreen';
 import SellImagesScreen from '../screens/customer/sell/SellImagesScreen';
 import SellAddressScreen from '../screens/customer/sell/SellAddressScreen';
 import SellCompleteScreen from '../screens/customer/sell/SellCompleteScreen';
+import SellOrderDetailsScreen from '../screens/customer/sell/SellOrderDetailsScreen';
 import SellSuccessScreen from '../screens/customer/sell/SellSuccessScreen';
 import SellQuotationScreen from '../screens/customer/sell/SellQuotationScreen';
 import SellSelectShopScreen from '../screens/customer/sell/SellSelectShopScreen';
@@ -151,6 +157,13 @@ export default function CustomerNavigator({ session, onLogout }) {
         {(props) => <CustomerTabs {...props} session={session} onLogout={onLogout} />}
       </Stack.Screen>
 
+      {/* Category service menu (Repair / Sell / Buy for a tapped category) */}
+      <Stack.Screen
+        name="CategoryServiceMenu"
+        component={CategoryServiceMenuScreen}
+        options={({ route }) => ({ title: route.params?.categoryName || 'Our Service' })}
+      />
+
       {/* Profile sub-flows */}
       <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ title: 'Edit Profile' }} />
       <Stack.Screen name="ManageAddress" component={ManageAddressScreen} options={{ title: 'Manage Address' }} />
@@ -165,8 +178,9 @@ export default function CustomerNavigator({ session, onLogout }) {
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
 
       {/* Device wizard */}
-      <Stack.Screen name="SelectCategory" component={SelectCategoryScreen} options={{ title: 'Select Device' }} />
+      <Stack.Screen name="SelectCategory" component={SelectCategoryScreen} options={{ title: 'Select Category' }} />
       <Stack.Screen name="SelectBrand" component={SelectBrandScreen} options={{ title: 'Select Brand' }} />
+      <Stack.Screen name="SelectSeries" component={SelectSeriesScreen} options={{ title: 'Select Series' }} />
       <Stack.Screen name="SelectModel" component={SelectModelScreen} options={{ title: 'Select Model' }} />
       <Stack.Screen name="SelectVariant" component={SelectVariantScreen} options={{ title: 'Your Device' }} />
 
@@ -181,8 +195,11 @@ export default function CustomerNavigator({ session, onLogout }) {
       <Stack.Screen name="RepairPickupSlot" component={RepairPickupSlotScreen} options={{ title: 'Select Pickup Slot' }} />
       <Stack.Screen name="RepairCompleteOrder" component={RepairCompleteOrderScreen} options={{ title: 'Complete Order' }} />
       <Stack.Screen name="RepairConfirmation" component={RepairConfirmationScreen} options={{ headerShown: false }} />
-      <Stack.Screen name="RepairOrderDetails" component={RepairOrderDetailsScreen} options={{ title: 'Order Details' }} />
-      <Stack.Screen name="RepairOrderHistory" component={RepairOrderHistoryScreen} options={{ title: 'Pickup Status' }} />
+      <Stack.Screen name="RepairOrderDetails" component={RepairOrderDetailsScreen} options={{ title: 'View Details' }} />
+      <Stack.Screen name="RepairOrderHistory" component={RepairOrderHistoryScreen} options={{ title: 'Service History' }} />
+      <Stack.Screen name="RepairPickupStatus" component={RepairPickupStatusScreen} options={{ title: 'Pickup Status' }} />
+      <Stack.Screen name="ServiceReceipt" component={ServiceReceiptScreen} options={{ title: 'Receipt' }} />
+      <Stack.Screen name="InvoiceReceipt" component={InvoiceReceiptScreen} options={{ title: 'Invoice Receipt' }} />
       <Stack.Screen name="ShopChat" component={ShopChatScreen} options={{ headerShown: false }} />
 
       {/* Sell flow */}
@@ -191,10 +208,11 @@ export default function CustomerNavigator({ session, onLogout }) {
       <Stack.Screen name="SellScreening" component={SellScreeningScreen} options={{ title: 'Screening Question' }} />
       <Stack.Screen name="SellScreenCondition" component={SellScreenConditionScreen} options={{ title: 'Screen' }} />
       <Stack.Screen name="SellFunctional" component={SellFunctionalScreen} options={{ title: 'Functional' }} />
-      <Stack.Screen name="SellAccessories" component={SellAccessoriesScreen} options={{ title: 'Accessories & Warranty' }} />
+      <Stack.Screen name="SellAccessoriesWarranty" component={SellAccessoriesWarrantyScreen} options={{ title: 'Accessoires & Warranty' }} />
       <Stack.Screen name="SellImages" component={SellImagesScreen} options={{ title: 'Sell Device Images' }} />
       <Stack.Screen name="SellAddress" component={SellAddressScreen} options={{ title: 'Select Address' }} />
       <Stack.Screen name="SellComplete" component={SellCompleteScreen} options={{ title: 'Complete Order' }} />
+      <Stack.Screen name="SellOrderDetails" component={SellOrderDetailsScreen} options={{ title: 'Sell Device Details' }} />
       <Stack.Screen name="SellSuccess" component={SellSuccessScreen} options={{ headerShown: false }} />
       <Stack.Screen name="SellQuotation" component={SellQuotationScreen} options={{ title: 'View Quotation Report' }} />
       <Stack.Screen name="SellSelectShop" component={SellSelectShopScreen} options={{ title: 'Select Sell Shop' }} />

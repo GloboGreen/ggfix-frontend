@@ -94,7 +94,7 @@ export function Button({
         <>
           {leftIcon ? <View className="mr-2">{leftIcon}</View> : null}
           {isTextChildren(children) ? (
-            <Text className={cn('text-base font-bold tracking-wide', textVariantClasses[variant], textClassName)}>{children}</Text>
+            <Text numberOfLines={1} className={cn('text-base font-bold tracking-wide', textVariantClasses[variant], textClassName)}>{children}</Text>
           ) : (
             children
           )}

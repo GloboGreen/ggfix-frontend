@@ -91,7 +91,7 @@ export default function SellAddressScreen({ navigation, route }) {
 
       <BottomActionBar
         title="Continue"
-        onPress={() => navigation.navigate('SellComplete', { ...params, addressId: selectedId })}
+        onPress={() => navigation.navigate('SellComplete', { ...params, addressId: selectedId, address: items.find((a) => a.id === selectedId) })}
         disabled={!selectedId}
       />
     </View>

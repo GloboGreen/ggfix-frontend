@@ -1,18 +1,14 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Image, Pressable, ScrollView, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import {
   Smartphone,
   Camera,
-  ImageIcon,
   Video,
   X,
   Plus,
   ShieldCheck,
-  Sparkles,
-  ChevronRight,
   Wrench,
-  RefreshCw,
 } from 'lucide-react-native';
 import {
   BottomActionBar,
@@ -78,30 +74,34 @@ export default function RepairReviewScreen({ navigation, route }) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 160 }}>
+      <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 120 }}>
 
         {/* Device summary */}
-        <Card className="rounded-2xl mb-3">
+        <Card className="rounded-2xl mb-2.5">
           <View className="flex-row items-center">
-            <View className="h-14 w-14 rounded-2xl bg-primary/10 items-center justify-center mr-3">
-              <Smartphone size={26} color="#00008B" />
+            <View className="h-11 w-11 rounded-xl bg-primary/10 items-center justify-center mr-3 overflow-hidden">
+              {device.imageUrl ? (
+                <Image source={{ uri: device.imageUrl }} style={{ width: 44, height: 44 }} resizeMode="cover" />
+              ) : (
+                <Smartphone size={20} color="#00008B" />
+              )}
             </View>
             <View className="flex-1">
-              <Text className="text-[11px] text-text-muted uppercase tracking-widest">Your Device</Text>
-              <Text className="text-[15px] font-extrabold text-text mt-0.5" numberOfLines={1}>{device.modelName || 'Device'}</Text>
+              <Text className="text-[10px] text-text-muted uppercase tracking-widest">Your Device</Text>
+              <Text className="text-[14px] font-extrabold text-text" numberOfLines={1}>{device.modelName || 'Device'}</Text>
               <View className="flex-row items-center mt-0.5 flex-wrap">
-                {device.color ? <Text className="text-[11px] text-text-muted mr-2">{device.color}</Text> : null}
-                {device.ramLabel ? <Text className="text-[11px] text-text-muted mr-2">· {device.ramLabel}</Text> : null}
-                {device.storageLabel ? <Text className="text-[11px] text-text-muted">· {device.storageLabel}</Text> : null}
+                {device.color ? <Text className="text-[10px] text-text-muted mr-2">{device.color}</Text> : null}
+                {device.ramLabel ? <Text className="text-[10px] text-text-muted mr-2">· {device.ramLabel}</Text> : null}
+                {device.storageLabel ? <Text className="text-[10px] text-text-muted">· {device.storageLabel}</Text> : null}
               </View>
             </View>
           </View>
         </Card>
 
         {/* Selected services */}
-        <Card className="rounded-2xl mb-3">
+        <Card className="rounded-2xl mb-2.5">
           <View className="flex-row items-center mb-2">
-            <Wrench size={16} color="#00008B" />
+            <Wrench size={15} color="#00008B" />
             <CardTitle className="ml-2 flex-1">Repair Services</CardTitle>
             <Badge variant="softPrimary">{services.length}</Badge>
           </View>
@@ -110,8 +110,8 @@ export default function RepairReviewScreen({ navigation, route }) {
           ) : (
             <View className="flex-row flex-wrap">
               {services.map((s) => (
-                <View key={s.id} className="bg-primary/10 rounded-full px-3 py-1 mr-2 mb-2">
-                  <Text className="text-[12px] font-bold text-primary">{s.name}</Text>
+                <View key={s.id} className="bg-primary/10 rounded-full px-2.5 py-1 mr-1.5 mb-1.5">
+                  <Text className="text-[11px] font-bold text-primary">{s.name}</Text>
                 </View>
               ))}
             </View>
@@ -119,88 +119,72 @@ export default function RepairReviewScreen({ navigation, route }) {
         </Card>
 
         {/* Device photos */}
-        <Card className="rounded-2xl mb-3">
+        <Card className="rounded-2xl mb-2.5">
           <View className="flex-row items-center mb-1">
-            <Camera size={16} color="#F59E0B" />
+            <Camera size={15} color="#F59E0B" />
             <CardTitle className="ml-2 flex-1">Device Photos</CardTitle>
             <Badge variant={ready ? 'softSuccess' : 'softWarning'}>
               {filled}/3
             </Badge>
           </View>
-          <Text className="text-[11px] text-text-muted mb-3">
-            Front & Back are required. The walkaround video is optional but speeds up the diagnosis.
+          <Text className="text-[10px] text-text-muted mb-2">
+            Front & Back required · video optional.
           </Text>
 
-          <View className="flex-row -mx-1.5">
+          <View className="flex-row -mx-1">
             {SLOTS.map((slot) => {
               const asset = media[slot.key];
               const accent = accentMap[slot.accent];
               const Icon = slot.icon;
               return (
-                <View key={slot.key} style={{ width: '33.333%' }} className="px-1.5">
+                <View key={slot.key} style={{ width: '33.333%' }} className="px-1">
                   <Pressable
                     onPress={() => pick(slot)}
-                    className={`rounded-2xl overflow-hidden border-2 border-dashed ${accent.border}`}
-                    style={{ aspectRatio: 3 / 4, backgroundColor: '#F8FAFC' }}
+                    className={`rounded-xl overflow-hidden border-2 border-dashed ${accent.border}`}
+                    style={{ height: 104, backgroundColor: '#F8FAFC' }}
                   >
                     {asset ? (
                       <View className="flex-1">
                         {slot.isVideo ? (
                           <View className="flex-1 bg-text/90 items-center justify-center">
-                            <Video size={28} color="#fff" />
-                            <Text className="text-white text-[10px] font-bold mt-1">VIDEO</Text>
-                            <Text className="text-white/80 text-[9px] mt-0.5">
-                              {asset.duration ? `${Math.round(asset.duration / 1000)}s` : 'Selected'}
-                            </Text>
+                            <Video size={22} color="#fff" />
+                            <Text className="text-white text-[9px] font-bold mt-0.5">VIDEO</Text>
                           </View>
                         ) : (
                           <Image source={{ uri: asset.uri }} style={{ flex: 1 }} resizeMode="cover" />
                         )}
                         <Pressable
                           onPress={() => remove(slot.key)}
-                          className="absolute right-1 top-1 h-6 w-6 rounded-full bg-black/60 items-center justify-center"
+                          className="absolute right-1 top-1 h-5 w-5 rounded-full bg-black/60 items-center justify-center"
                         >
-                          <X size={12} color="#fff" />
-                        </Pressable>
-                        <Pressable
-                          onPress={() => pick(slot)}
-                          className="absolute left-1 top-1 h-6 w-6 rounded-full bg-black/60 items-center justify-center"
-                        >
-                          <RefreshCw size={11} color="#fff" />
+                          <X size={11} color="#fff" />
                         </Pressable>
                       </View>
                     ) : (
-                      <View className="flex-1 items-center justify-center px-2">
-                        <View className={`h-10 w-10 rounded-full ${accent.bg} items-center justify-center mb-2`}>
-                          <Icon size={18} color={accent.tint} />
+                      <View className="flex-1 items-center justify-center">
+                        <View className={`h-9 w-9 rounded-full ${accent.bg} items-center justify-center mb-1.5`}>
+                          <Icon size={16} color={accent.tint} />
                         </View>
-                        <View className="h-5 w-5 rounded-full bg-card border border-border items-center justify-center mb-1">
-                          <Plus size={10} color="#0F172A" />
+                        <View className="flex-row items-center">
+                          <Plus size={10} color="#64748B" />
+                          <Text className="text-[9px] text-text-muted ml-0.5">Add</Text>
                         </View>
                       </View>
                     )}
                   </Pressable>
-                  <Text className={`text-[11px] font-extrabold mt-1.5 text-center ${asset ? accent.text : 'text-text'}`}>
+                  <Text className={`text-[10px] font-extrabold mt-1 text-center ${asset ? accent.text : 'text-text'}`} numberOfLines={1}>
                     {slot.label}
                   </Text>
-                  <Text className="text-[10px] text-text-muted text-center" numberOfLines={1}>{slot.hint}</Text>
                 </View>
               );
             })}
           </View>
-
-          <View className="bg-primary/5 border border-primary/10 rounded-xl p-2.5 mt-3 flex-row items-start">
-            <Sparkles size={12} color="#00008B" />
-            <Text className="text-[11px] text-text-muted ml-2 flex-1 leading-4">
-              Good lighting & a clean background help our techs give a quicker, more accurate quote.
-            </Text>
-          </View>
         </Card>
 
-        <View className="bg-success/5 border border-success/20 rounded-2xl p-3 flex-row items-center">
-          <ShieldCheck size={16} color="#10B981" />
-          <Text className="text-[11px] text-text ml-2 flex-1">
-            Photos are encrypted in transit and only visible to the shop you book.
+        <View className="flex-row items-center px-1">
+          <ShieldCheck size={13} color="#10B981" />
+          <Text className="text-[10px] text-text-muted ml-1.5 flex-1">
+            Photos are encrypted and only visible to the shop you book.
           </Text>
         </View>
       </ScrollView>
@@ -216,3 +200,4 @@ export default function RepairReviewScreen({ navigation, route }) {
     </View>
   );
 }
+

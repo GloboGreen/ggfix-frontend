@@ -24,3 +24,11 @@ export async function getSession() {
     return null;
   }
 }
+
+// Lets the API client notify the app when a token is rejected (expired/invalid)
+// so it can clear state and route back to Login.
+let authExpiredHandler = null;
+export function setAuthExpiredHandler(fn) { authExpiredHandler = fn; }
+export function notifyAuthExpired() {
+  try { if (authExpiredHandler) authExpiredHandler(); } catch (_) {}
+}

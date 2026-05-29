@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
-import { Smartphone, MapPin, Store, Calendar, Wrench, ShieldCheck, Tag, Truck } from 'lucide-react-native';
+﻿import React, { useEffect, useState } from 'react';
+import { Image, ScrollView, Text, View } from 'react-native';
+import { Smartphone, MapPin, Store, Calendar, Wrench, ShieldCheck, Tag, Truck, Phone, Camera, Video } from 'lucide-react-native';
 import { notify } from '../../../components/confirm';
 import {
   Card,
@@ -59,7 +59,7 @@ export default function RepairCompleteOrderScreen({ navigation, route }) {
         pickupSlotEnd: p.pickupSlotEnd,
       };
       const created = await createRepairBooking(payload);
-      navigation.replace('RepairConfirmation', { booking: created, shop, address: addr, services: p.services });
+      navigation.replace('RepairConfirmation', { booking: created, device: p.device, shop, address: addr, services: p.services });
     } catch (e) {
       notify('Error', e.message);
     } finally { setSaving(false); }
@@ -80,8 +80,12 @@ export default function RepairCompleteOrderScreen({ navigation, route }) {
         <View className="mb-3">
           <Card className="rounded-2xl">
             <View className="flex-row items-center">
-              <View className="h-14 w-14 rounded-2xl bg-primary/10 items-center justify-center mr-3">
-                <Smartphone size={26} color="#00008B" />
+              <View className="h-14 w-14 rounded-2xl bg-primary/10 items-center justify-center mr-3 overflow-hidden">
+                {dev.imageUrl ? (
+                  <Image source={{ uri: dev.imageUrl }} style={{ width: 56, height: 56 }} resizeMode="cover" />
+                ) : (
+                  <Smartphone size={26} color="#00008B" />
+                )}
               </View>
               <View className="flex-1">
                 <Text className="text-[11px] text-text-muted uppercase tracking-widest">Your Device</Text>
@@ -110,6 +114,40 @@ export default function RepairCompleteOrderScreen({ navigation, route }) {
           ))}
         </Card>
 
+        {/* Device photos captured during review */}
+        {p.media && (p.media.front?.uri || p.media.back?.uri || p.media.video?.uri) ? (
+          <Card className="mb-3 rounded-2xl">
+            <View className="flex-row items-center mb-2">
+              <Camera size={16} color="#F59E0B" />
+              <CardTitle className="ml-2">Device Photos</CardTitle>
+            </View>
+            <View className="flex-row -mx-1">
+              {[
+                { key: 'front', label: 'Front', asset: p.media.front },
+                { key: 'back', label: 'Back', asset: p.media.back },
+                { key: 'video', label: 'Video', asset: p.media.video, isVideo: true },
+              ].map((m) => {
+                if (!m.asset?.uri) return null;
+                return (
+                  <View key={m.key} style={{ width: '33.333%' }} className="px-1">
+                    <View className="rounded-xl overflow-hidden border border-border" style={{ height: 96, backgroundColor: '#F8FAFC' }}>
+                      {m.isVideo ? (
+                        <View className="flex-1 bg-text/90 items-center justify-center">
+                          <Video size={22} color="#fff" />
+                          <Text className="text-white text-[9px] font-bold mt-0.5">VIDEO</Text>
+                        </View>
+                      ) : (
+                        <Image source={{ uri: m.asset.uri }} style={{ flex: 1 }} resizeMode="cover" />
+                      )}
+                    </View>
+                    <Text className="text-[10px] font-bold text-text-muted text-center mt-1">{m.label}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          </Card>
+        ) : null}
+
         <Card className="mb-3 rounded-2xl">
           <View className="flex-row items-center mb-2">
             <MapPin size={16} color="#10B981" />
@@ -136,13 +174,18 @@ export default function RepairCompleteOrderScreen({ navigation, route }) {
             <>
               <Text className="text-[13px] font-bold text-text">{shop.name}</Text>
               <Text className="text-[12px] text-text-muted mt-1">{shop.address}</Text>
-              {shop.phone ? <Text className="text-[12px] text-text-muted">📞 {shop.phone}</Text> : null}
+              {shop.phone ? (
+                <View className="flex-row items-center mt-1">
+                  <Phone size={12} color="#64748B" />
+                  <Text className="text-[12px] text-text-muted ml-1">{shop.phone}</Text>
+                </View>
+              ) : null}
             </>
           ) : null}
           <View className="flex-row items-center bg-secondary/5 border border-secondary/15 rounded-xl mt-3 px-3 py-2">
             <Calendar size={14} color="#2563EB" />
             <Text className="text-[12px] font-bold text-secondary ml-2">
-              {p.pickupDate}  ·  {formatTime(p.pickupSlotStart)} – {formatTime(p.pickupSlotEnd)}
+              {p.pickupDate} · {formatTime(p.pickupSlotStart)} - {formatTime(p.pickupSlotEnd)}
             </Text>
           </View>
         </Card>
@@ -166,7 +209,7 @@ export default function RepairCompleteOrderScreen({ navigation, route }) {
         <View className="bg-warning/10 border border-warning/30 rounded-2xl p-3 flex-row items-center">
           <Truck size={16} color="#F59E0B" />
           <Text className="text-[11px] text-text ml-2 flex-1">
-            Pay on pickup, after diagnosis, or after repair — your choice.
+            Pay on pickup, after diagnosis, or after repair - your choice.
           </Text>
         </View>
       </ScrollView>
@@ -182,3 +225,4 @@ export default function RepairCompleteOrderScreen({ navigation, route }) {
     </View>
   );
 }
+

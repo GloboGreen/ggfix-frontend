@@ -33,10 +33,10 @@ export function BottomActionBar({
     >
       <View className="flex-row items-center">
         {hasPrice ? (
-          <View className="mr-3">
-            {priceCaption ? <Text className="text-[11px] text-text-muted">{priceCaption}</Text> : null}
-            <Text className="text-lg font-extrabold text-text leading-6">{priceValue}</Text>
-            {priceLabel ? <Text className="text-[11px] text-text-muted">{priceLabel}</Text> : null}
+          <View className="mr-3" style={{ maxWidth: '46%' }}>
+            {priceCaption ? <Text className="text-[11px] text-text-muted" numberOfLines={1}>{priceCaption}</Text> : null}
+            <Text className="text-base font-extrabold text-text leading-5" numberOfLines={1}>{priceValue}</Text>
+            {priceLabel ? <Text className="text-[11px] text-text-muted" numberOfLines={1}>{priceLabel}</Text> : null}
           </View>
         ) : null}
         <View className={cn(hasPrice ? '' : 'flex-1')} style={hasPrice ? { flex: 1 } : null}>

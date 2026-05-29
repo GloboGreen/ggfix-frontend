@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -105,7 +105,7 @@ export default function ShopChatScreen({ navigation, route }) {
     if (!body) return;
     if (!overrideText) setText('');
 
-    // If the thread didn't open, surface that — don't silently swallow the tap.
+    // If the thread didn't open, surface that â€” don't silently swallow the tap.
     if (!thread?.id) {
       notify(
         'Chat not connected',
@@ -168,7 +168,7 @@ export default function ShopChatScreen({ navigation, route }) {
             <Text className="text-[14px] font-extrabold text-text" numberOfLines={1}>{shopName}</Text>
             <View className="flex-row items-center mt-0.5">
               <View className="h-1.5 w-1.5 rounded-full bg-success mr-1" />
-              <Text className="text-[10px] text-text-muted">Online · Typically replies in ~10 min</Text>
+              <Text className="text-[10px] text-text-muted">Online Â· Typically replies in ~10 min</Text>
             </View>
           </View>
           <Pressable
@@ -191,7 +191,7 @@ export default function ShopChatScreen({ navigation, route }) {
             <MessageCircle size={12} color="#10B981" />
             <Text className="text-[11px] font-bold text-success ml-1.5">ENQUIRY MODE</Text>
             <Text className="text-[11px] text-text-muted ml-2 flex-1" numberOfLines={1}>
-              Free chat · No booking yet
+              Free chat Â· No booking yet
             </Text>
           </View>
         ) : null}
@@ -231,7 +231,7 @@ export default function ShopChatScreen({ navigation, route }) {
           <View className="self-center bg-card border border-border rounded-full px-3 py-1 mb-3 flex-row items-center">
             <ShieldCheck size={11} color="#10B981" />
             <Text className="text-[10px] text-text-muted ml-1">
-              Encrypted via ggfix · Booking-safe chat
+              Encrypted via ggfix Â· Booking-safe chat
             </Text>
           </View>
 
@@ -349,3 +349,4 @@ export default function ShopChatScreen({ navigation, route }) {
     </View>
   );
 }
+

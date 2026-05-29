@@ -1,18 +1,34 @@
-import React from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Image, Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ShoppingCart, ArrowRight, Smartphone, Laptop, Watch, Tablet, Headphones, Cable } from 'lucide-react-native';
-import { SearchBar, SectionHeader, OfferBanner, Badge } from '../../../components/rnr';
+import { ShoppingCart, ArrowRight } from 'lucide-react-native';
+import { SearchBar, SectionHeader, OfferBanner, Badge, EmptyState, Loader } from '../../../components/rnr';
+import { getDeviceCategories } from '../../../api/masterData';
 
-const CATS = [
-  { id: 'SMARTPHONE', name: 'Smartphones', emoji: '📱', color: '#EEF2FF' },
-  { id: 'LAPTOP', name: 'Laptops', emoji: '💻', color: '#F5F3FF' },
-  { id: 'SMARTWATCH', name: 'Smartwatches', emoji: '⌚', color: '#FFFBEB' },
-  { id: 'TABLET', name: 'Tablets', emoji: '📲', color: '#F0F9FF' },
-  { id: 'AUDIO', name: 'Audio', emoji: '🎧', color: '#FFF1F2' },
-  { id: 'ACCESSORIES', name: 'Accessories', emoji: '🔌', color: '#ECFDF5' },
-];
+// Per-code emoji/tint fallback so admin-driven categories keep a friendly
+// visual when they have no uploaded image yet.
+const CODE_META = {
+  MOBILE:        { emoji: '📱', bg: '#EEF2FF' },
+  SMARTPHONE:    { emoji: '📱', bg: '#EEF2FF' },
+  LAPTOP:        { emoji: '💻', bg: '#F5F3FF' },
+  SMARTWATCH:    { emoji: '⌚', bg: '#FFFBEB' },
+  SMARTWATCHES:  { emoji: '⌚', bg: '#FFFBEB' },
+  TABLET:        { emoji: '📲', bg: '#F0F9FF' },
+  AUDIO:         { emoji: '🎧', bg: '#FFF1F2' },
+  AUDIO_DEVICES: { emoji: '🎧', bg: '#FFF1F2' },
+};
+const DEFAULT_META = { emoji: '📱', bg: '#EEF2FF' };
+
+// Resolve an admin-uploaded category image (base64 preferred) to an <Image>
+// uri, or null when the category has no image.
+function imgUri(item) {
+  if (!item) return null;
+  const b64 = item.imageBase64 && String(item.imageBase64).trim();
+  if (b64) return b64.startsWith('data:') ? b64 : `data:image/png;base64,${b64}`;
+  const url = item.imageUrl && String(item.imageUrl).trim();
+  return url || null;
+}
 
 const COLLECTIONS = [
   { title: 'Best Selling Android', sub: 'Top picks under ₹15,000', palette: 'emerald', emoji: '🤖' },
@@ -21,6 +37,27 @@ const COLLECTIONS = [
 ];
 
 export default function BuyHomeScreen({ navigation }) {
+  const [cats, setCats] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const { width } = useWindowDimensions();
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const list = await getDeviceCategories();
+        setCats((list || []).filter((c) => c.isActive !== false));
+      } catch (_) {}
+      setLoading(false);
+    })();
+  }, []);
+
+  // Responsive grid: 2 cards per row on phones, 3 on wider screens/tablets.
+  const numCols = width >= 600 ? 3 : 2;
+  const gridGap = 10;
+  const gridPadH = 14;
+  const cardW = Math.floor((width - gridPadH * 2 - gridGap * (numCols - 1)) / numCols);
+  const imgH = Math.round(cardW * 0.7);
+
   return (
     <View className="flex-1 bg-background">
       <SafeAreaView edges={['top']} style={{ backgroundColor: '#00008B' }}>
@@ -44,7 +81,7 @@ export default function BuyHomeScreen({ navigation }) {
           </View>
         </LinearGradient>
         <View className="px-4 -mt-5">
-          <SearchBar placeholder="Search mobiles, accessories & more..." onPress={() => navigation.navigate('BuyCategory', { categoryId: 'SMARTPHONE', categoryName: 'Smartphones' })} />
+          <SearchBar placeholder="Search mobiles, accessories & more..." onPress={() => navigation.navigate('BuyCategory', {})} />
         </View>
       </SafeAreaView>
 
@@ -61,22 +98,46 @@ export default function BuyHomeScreen({ navigation }) {
         </View>
 
         <SectionHeader title="Shop by Category" caption="Pick a category to browse" />
-        <View className="px-3 flex-row flex-wrap">
-          {CATS.map((c) => (
-            <View key={c.id} style={{ width: '33.333%' }} className="p-1.5">
-              <Pressable
-                onPress={() => navigation.navigate('BuyCategory', { categoryId: c.id, categoryName: c.name })}
-                className="bg-card border border-border rounded-2xl p-3 items-center active:opacity-80"
-                style={{ shadowColor: '#0F172A', shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 1 }}
-              >
-                <View className="h-12 w-12 rounded-full items-center justify-center mb-2" style={{ backgroundColor: c.color }}>
-                  <Text style={{ fontSize: 24 }}>{c.emoji}</Text>
-                </View>
-                <Text className="text-[12px] font-bold text-text text-center" numberOfLines={1}>{c.name}</Text>
-              </Pressable>
-            </View>
-          ))}
-        </View>
+        {loading ? (
+          <View className="py-8"><Loader label="Loading categories..." /></View>
+        ) : cats.length === 0 ? (
+          <View className="px-4">
+            <EmptyState title="No categories yet" description="The admin hasn't published any device categories." />
+          </View>
+        ) : (
+          <View className="flex-row flex-wrap" style={{ paddingHorizontal: gridPadH }}>
+            {cats.map((c, i) => {
+              const code = (c.code || '').toUpperCase();
+              const meta = CODE_META[code] || DEFAULT_META;
+              const uri = imgUri(c);
+              return (
+                <Pressable
+                  key={c.id}
+                  onPress={() => navigation.navigate('BuyCategory', { categoryId: c.id, categoryCode: code, categoryName: c.name })}
+                  className="bg-card border border-border rounded-2xl p-2.5 active:opacity-80"
+                  style={{
+                    width: cardW,
+                    marginLeft: i % numCols === 0 ? 0 : gridGap,
+                    marginBottom: gridGap,
+                    shadowColor: '#0F172A', shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 1,
+                  }}
+                >
+                  <View
+                    className="rounded-xl items-center justify-center overflow-hidden mb-2"
+                    style={{ width: '100%', height: imgH, backgroundColor: uri ? '#F8FAFC' : meta.bg }}
+                  >
+                    {uri ? (
+                      <Image source={{ uri }} style={{ width: '90%', height: '90%' }} resizeMode="contain" />
+                    ) : (
+                      <Text style={{ fontSize: 34 }}>{meta.emoji}</Text>
+                    )}
+                  </View>
+                  <Text className="text-[13px] font-extrabold text-text text-center" numberOfLines={1}>{c.name}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
 
         <SectionHeader title="Top Collections" caption="Curated for you" />
         <View className="px-4">

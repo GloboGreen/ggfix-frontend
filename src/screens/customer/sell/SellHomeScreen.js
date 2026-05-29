@@ -1,17 +1,34 @@
-import React from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Image, Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Tag, ChevronRight, TrendingUp, ShieldCheck, Sparkles } from 'lucide-react-native';
-import { SectionHeader, OfferBanner } from '../../../components/rnr';
+import { Tag, TrendingUp, ShieldCheck, Sparkles } from 'lucide-react-native';
+import { SectionHeader, OfferBanner, EmptyState, Loader } from '../../../components/rnr';
+import { getDeviceCategories } from '../../../api/masterData';
 
-const CATS = [
-  { id: 'SMARTPHONE', name: 'Smartphones',   sub: 'Get instant quote',    emoji: '📱', color: '#EEF2FF' },
-  { id: 'LAPTOP',     name: 'Laptops',       sub: 'Fair market value',    emoji: '💻', color: '#F5F3FF' },
-  { id: 'SMARTWATCH', name: 'Smartwatches',  sub: 'All brands accepted',  emoji: '⌚', color: '#FFFBEB' },
-  { id: 'TABLET',     name: 'Tablets',       sub: 'Top price guaranteed', emoji: '📲', color: '#F0F9FF' },
-  { id: 'AUDIO',      name: 'Audio Devices', sub: 'Earbuds & headphones', emoji: '🎧', color: '#FFF1F2' },
-];
+// Per-code emoji/tint/sub fallback so admin-driven categories keep a friendly
+// visual when they have no uploaded image yet.
+const CODE_META = {
+  MOBILE:        { emoji: '📱', bg: '#EEF2FF', sub: 'Get instant quote' },
+  SMARTPHONE:    { emoji: '📱', bg: '#EEF2FF', sub: 'Get instant quote' },
+  LAPTOP:        { emoji: '💻', bg: '#F5F3FF', sub: 'Fair market value' },
+  SMARTWATCH:    { emoji: '⌚', bg: '#FFFBEB', sub: 'All brands accepted' },
+  SMARTWATCHES:  { emoji: '⌚', bg: '#FFFBEB', sub: 'All brands accepted' },
+  TABLET:        { emoji: '📲', bg: '#F0F9FF', sub: 'Top price guaranteed' },
+  AUDIO:         { emoji: '🎧', bg: '#FFF1F2', sub: 'Earbuds & headphones' },
+  AUDIO_DEVICES: { emoji: '🎧', bg: '#FFF1F2', sub: 'Earbuds & headphones' },
+};
+const DEFAULT_META = { emoji: '📱', bg: '#EEF2FF', sub: 'Get the best price' };
+
+// Resolve an admin-uploaded category image (base64 preferred) to an <Image>
+// uri, or null when the category has no image.
+function imgUri(item) {
+  if (!item) return null;
+  const b64 = item.imageBase64 && String(item.imageBase64).trim();
+  if (b64) return b64.startsWith('data:') ? b64 : `data:image/png;base64,${b64}`;
+  const url = item.imageUrl && String(item.imageUrl).trim();
+  return url || null;
+}
 
 const STEPS = [
   { n: 1, title: 'Tell us about your device', sub: 'Model · condition · accessories' },
@@ -20,6 +37,27 @@ const STEPS = [
 ];
 
 export default function SellHomeScreen({ navigation }) {
+  const [cats, setCats] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const { width } = useWindowDimensions();
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const list = await getDeviceCategories();
+        setCats((list || []).filter((c) => c.isActive !== false));
+      } catch (_) {}
+      setLoading(false);
+    })();
+  }, []);
+
+  // Responsive grid: 2 cards per row on phones, 3 on wider screens/tablets.
+  const numCols = width >= 600 ? 3 : 2;
+  const gridGap = 10;
+  const gridPadH = 14;
+  const cardW = Math.floor((width - gridPadH * 2 - gridGap * (numCols - 1)) / numCols);
+  const imgH = Math.round(cardW * 0.66);
+
   return (
     <View className="flex-1 bg-background">
       <SafeAreaView edges={['top']} style={{ backgroundColor: '#059669' }}>
@@ -27,7 +65,7 @@ export default function SellHomeScreen({ navigation }) {
           colors={['#059669', '#10B981']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={{ paddingTop: 8, paddingBottom: 12, borderBottomLeftRadius: 20, borderBottomRightRadius: 20 }}
+          style={{ paddingTop: 8, paddingBottom: 14, borderBottomLeftRadius: 20, borderBottomRightRadius: 20 }}
         >
           <View className="px-4">
             <Text className="text-white text-[10px] font-bold tracking-widest">SELL & EARN</Text>
@@ -60,28 +98,53 @@ export default function SellHomeScreen({ navigation }) {
         </View>
 
         <SectionHeader title="Select Category" caption="What are you selling today?" />
-        <View className="px-3">
-          {CATS.map((c) => (
-            <Pressable
-              key={c.id}
-              onPress={() => navigation.navigate('SellSelectDevice', { flow: 'SELL', categoryId: c.id })}
-              className="bg-card border border-border rounded-xl px-2.5 py-2 flex-row items-center mb-2 mx-1 active:opacity-80"
-            >
-              <View className="h-10 w-10 rounded-xl items-center justify-center mr-2.5" style={{ backgroundColor: c.color }}>
-                <Text style={{ fontSize: 20 }}>{c.emoji}</Text>
-              </View>
-              <View className="flex-1">
-                <Text className="text-[13px] font-extrabold text-text">{c.name}</Text>
-                <Text className="text-[11px] text-text-muted mt-0.5">{c.sub}</Text>
-              </View>
-              <View className="bg-success/10 rounded-full px-2 py-0.5 flex-row items-center mr-1">
-                <Tag size={10} color="#10B981" />
-                <Text className="text-[10px] font-bold text-success ml-1">Sell</Text>
-              </View>
-              <ChevronRight size={14} color="#94A3B8" />
-            </Pressable>
-          ))}
-        </View>
+        {loading ? (
+          <View className="py-8"><Loader label="Loading categories..." /></View>
+        ) : cats.length === 0 ? (
+          <View className="px-4">
+            <EmptyState title="No categories yet" description="The admin hasn't published any device categories." />
+          </View>
+        ) : (
+          <View className="flex-row flex-wrap" style={{ paddingHorizontal: gridPadH }}>
+            {cats.map((c, i) => {
+              const code = (c.code || '').toUpperCase();
+              const meta = CODE_META[code] || DEFAULT_META;
+              const uri = imgUri(c);
+              return (
+                <Pressable
+                  key={c.id}
+                  onPress={() => navigation.navigate('SellSelectDevice', { flow: 'SELL', categoryId: c.id, categoryCode: code, categoryName: c.name })}
+                  className="bg-card border border-border rounded-2xl p-2.5 active:opacity-80"
+                  style={{
+                    width: cardW,
+                    marginLeft: i % numCols === 0 ? 0 : gridGap,
+                    marginBottom: gridGap,
+                    shadowColor: '#0F172A', shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 1,
+                  }}
+                >
+                  <View
+                    className="rounded-xl items-center justify-center overflow-hidden mb-2"
+                    style={{ width: '100%', height: imgH, backgroundColor: uri ? '#FFFFFF' : meta.bg }}
+                  >
+                    {uri ? (
+                      <Image source={{ uri }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
+                    ) : (
+                      <Text style={{ fontSize: 34 }}>{meta.emoji}</Text>
+                    )}
+                  </View>
+                  <View className="flex-row items-center">
+                    <Text className="flex-1 text-[14px] font-extrabold text-text" numberOfLines={1}>{c.name}</Text>
+                    <View className="bg-success/10 rounded-full px-1.5 py-0.5 flex-row items-center ml-1">
+                      <Tag size={9} color="#10B981" />
+                      <Text className="text-[9px] font-bold text-success ml-0.5">Sell</Text>
+                    </View>
+                  </View>
+                  <Text className="text-[11px] text-text-muted mt-0.5" numberOfLines={1}>{meta.sub}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
 
         <SectionHeader title="How it works" />
         <View className="px-4">

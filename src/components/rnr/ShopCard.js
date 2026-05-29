@@ -12,6 +12,13 @@ const cardShadow = {
   elevation: 3,
 };
 
+// "0.2956…" -> "296 m"; "1.2345" -> "1.2 km". Returns null when not usable.
+function formatDistance(d) {
+  const n = Number(d);
+  if (!isFinite(n) || n <= 0) return null;
+  return n < 1 ? `${Math.round(n * 1000)} m` : `${n.toFixed(1)} km`;
+}
+
 export function ShopCard({
   name,
   address,
@@ -19,6 +26,8 @@ export function ShopCard({
   reviews,
   distance,
   eta,
+  etaText,
+  travelTimes,
   open = true,
   onPress,
   onCall,
@@ -58,16 +67,31 @@ export function ShopCard({
                 {reviews ? <Text className="text-[11px] text-success/80 ml-1">({reviews})</Text> : null}
               </View>
             ) : null}
-            {distance ? (
-              <Text className="text-[11px] text-text-muted mr-2">{distance} km</Text>
+            {formatDistance(distance) ? (
+              <Text className="text-[11px] text-text-muted mr-2">{formatDistance(distance)}</Text>
             ) : null}
-            {eta ? (
+            {!travelTimes?.length && (etaText || eta) ? (
               <View className="flex-row items-center">
                 <Clock size={11} color="#64748B" />
-                <Text className="text-[11px] text-text-muted ml-1">{eta} min</Text>
+                <Text className="text-[11px] text-text-muted ml-1">{etaText || `${eta} min`}</Text>
               </View>
             ) : null}
           </View>
+
+          {/* Per-mode travel times from the customer's location to this shop */}
+          {travelTimes?.length ? (
+            <View className="flex-row items-center mt-1.5">
+              {travelTimes.map((t) => {
+                const TIcon = t.Icon;
+                return (
+                  <View key={t.key} className="flex-row items-center mr-4">
+                    {TIcon ? <TIcon size={13} color="#64748B" /> : null}
+                    <Text className="text-[11px] font-bold text-text ml-1">{t.text}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          ) : null}
         </View>
       </View>
       {(onCall || onDirections) ? (

@@ -30,8 +30,10 @@ export async function setDefaultAddress(id) {
 }
 
 // Devices
-export async function listSavedDevices() {
-  return unwrap(await userApi.get('/customer/devices'));
+export async function listSavedDevices({ categoryCode } = {}) {
+  return unwrap(await userApi.get('/customer/devices', {
+    query: categoryCode ? { categoryCode } : undefined,
+  }));
 }
 export async function createSavedDevice(payload) {
   return await userApi.post('/customer/devices', { body: payload });

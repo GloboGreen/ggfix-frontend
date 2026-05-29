@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, Text, View } from 'react-native';
 import {
   Smartphone,
   Cpu,
@@ -8,7 +8,13 @@ import {
   Check,
   Tag,
   ShieldCheck,
+  Skull,
 } from 'lucide-react-native';
+
+const SELL_CONDITIONS = [
+  { key: 'WORKING', label: 'Working Phone', sub: 'Turns on · Calls · No major issues', icon: Smartphone, color: '#10B981', bg: 'bg-success/10', activeBg: 'bg-success/15', border: 'border-success' },
+  { key: 'DEAD', label: 'Phone Dead / Unknown', sub: "Won't turn on · Not sure", icon: Skull, color: '#EF4444', bg: 'bg-danger/10', activeBg: 'bg-danger/15', border: 'border-danger' },
+];
 import { notify } from '../../../components/confirm';
 import {
   BottomActionBar,
@@ -43,6 +49,7 @@ export default function SelectVariantScreen({ navigation, route }) {
   const brandId = route?.params?.brandId;
   const brandName = route?.params?.brandName;
   const categoryId = route?.params?.categoryId;
+  const modelImageUrl = route?.params?.modelImageUrl;
 
   const [rams, setRams] = useState([]);
   const [storages, setStorages] = useState([]);
@@ -52,6 +59,7 @@ export default function SelectVariantScreen({ navigation, route }) {
   const [storage, setStorage] = useState(route?.params?.storageOptionId ? { id: route.params.storageOptionId, label: '' } : null);
   const [color, setColor] = useState(route?.params?.color ? { id: route.params.color, name: route.params.color } : null);
   const [imei, setImei] = useState(route?.params?.imei || '');
+  const [condition, setCondition] = useState('WORKING'); // sell flow: phone condition
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -93,12 +101,35 @@ export default function SelectVariantScreen({ navigation, route }) {
 
   const onContinue = async () => {
     if (!ram || !storage || !color) return;
+
+    // Only send UUID-typed fields the backend can parse. Hardcoded category
+    // codes like 'SMARTPHONE' (from Home tiles / fallback list) would fail
+    // Spring's @RequestBody UUID parsing — strip anything that isn't a UUID.
+    const isUuid = (v) => typeof v === 'string'
+      && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+    const onlyUuid = (v) => (isUuid(v) ? v : undefined);
+
+    // categoryCode is a string code like SMARTPHONE / LAPTOP — preserved
+    // separately from the UUID so the backend can filter saved devices per
+    // category even when no UUID was known at booking time.
+    const categoryCodeString = typeof categoryId === 'string' && !isUuid(categoryId)
+      ? categoryId.toUpperCase()
+      : (route?.params?.categoryCode || undefined);
+
     const payload = {
-      categoryId,
-      brandId,
-      modelId,
-      ramOptionId: ram.id,
-      storageOptionId: storage.id,
+      categoryId: onlyUuid(categoryId),
+      categoryCode: categoryCodeString,
+      brandId: onlyUuid(brandId),
+      modelId: onlyUuid(modelId),
+      // Denormalized display fields so the saved-device list can render the
+      // real name/brand/specs without a master-data join.
+      modelName: modelName && modelName !== 'Device' ? modelName : undefined,
+      brandName: brandName || undefined,
+      imageUrl: modelImageUrl || undefined,
+      ramLabel: ram?.label || undefined,
+      storageLabel: storage?.label || undefined,
+      ramOptionId: onlyUuid(ram.id),
+      storageOptionId: onlyUuid(storage.id),
       color: color?.name || color?.id,
       imei: flow === 'SELL' ? imei : undefined,
     };
@@ -111,7 +142,7 @@ export default function SelectVariantScreen({ navigation, route }) {
         navigation.popToTop();
         navigation.navigate('ManageDevice');
       } catch (e) {
-        notify('Error', e.message);
+        notify('Save failed', e.message || 'Could not save device. Try again.');
       } finally { setSaving(false); }
       return;
     }
@@ -120,7 +151,7 @@ export default function SelectVariantScreen({ navigation, route }) {
       return;
     }
     if (flow === 'SELL') {
-      navigation.navigate('SellCondition', { device: { ...payload, modelName, imei } });
+      navigation.navigate('SellScreening', { device: { ...payload, modelName, imei }, workingCondition: condition });
       return;
     }
   };
@@ -139,8 +170,12 @@ export default function SelectVariantScreen({ navigation, route }) {
         {/* Device summary */}
         <View className="bg-card border border-border rounded-2xl p-3 mb-3 flex-row items-center"
               style={{ shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 2 }}>
-          <View className="h-14 w-14 rounded-2xl bg-primary/10 items-center justify-center mr-3">
-            <Smartphone size={26} color="#00008B" />
+          <View className="h-14 w-14 rounded-2xl bg-primary/10 items-center justify-center mr-3 overflow-hidden">
+            {modelImageUrl ? (
+              <Image source={{ uri: modelImageUrl }} style={{ width: 56, height: 56 }} resizeMode="cover" />
+            ) : (
+              <Smartphone size={26} color="#00008B" />
+            )}
           </View>
           <View className="flex-1">
             <Text className="text-[11px] text-text-muted uppercase tracking-widest">Your Device</Text>
@@ -292,6 +327,34 @@ export default function SelectVariantScreen({ navigation, route }) {
               keyboardType="number-pad"
               className="py-2 text-[13px]"
             />
+          </View>
+        ) : null}
+
+        {/* Phone condition (sell flow) */}
+        {flow === 'SELL' ? (
+          <View className="bg-card border border-border rounded-2xl p-3 mb-3">
+            <Text className="text-[11px] font-extrabold text-text-muted tracking-widest mb-2">PHONE CONDITION</Text>
+            <View className="flex-row -mx-1">
+              {SELL_CONDITIONS.map((o) => {
+                const Icon = o.icon;
+                const active = condition === o.key;
+                return (
+                  <View key={o.key} className="px-1 flex-1">
+                    <Pressable
+                      onPress={() => setCondition(o.key)}
+                      className={`rounded-xl border-2 p-3 items-center ${active ? `${o.activeBg} ${o.border}` : 'bg-card border-border'}`}
+                    >
+                      <View className={`h-10 w-10 rounded-full items-center justify-center mb-1.5 ${o.bg}`}>
+                        <Icon size={20} color={o.color} />
+                      </View>
+                      <Text className="text-[12px] font-extrabold text-text text-center" numberOfLines={1}>{o.label}</Text>
+                      <Text className="text-[10px] text-text-muted mt-0.5 text-center" numberOfLines={2}>{o.sub}</Text>
+                      {active ? <Badge variant={o.key === 'WORKING' ? 'softSuccess' : 'softDanger'} className="mt-1.5">SELECTED</Badge> : null}
+                    </Pressable>
+                  </View>
+                );
+              })}
+            </View>
           </View>
         ) : null}
 

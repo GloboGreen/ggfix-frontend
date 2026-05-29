@@ -7,19 +7,20 @@ import colors from '../theme/colors';
 import BackButton from '../components/BackButton';
 import DashboardScreen from '../screens/owner/DashboardScreen';
 import MyAccountScreen from '../screens/owner/MyAccountScreen';
-import BookingHistoryScreen from '../screens/owner/BookingHistoryScreen';
+// All booking-related screens are now grouped under owner/AllBooking/
+import BookingHistoryScreen from '../screens/owner/AllBooking/BookingHistoryScreen';
 import BillingScreen from '../screens/owner/BillingScreen';
 import BuyScreen from '../screens/owner/BuyScreen';
 import TicketListScreen from '../screens/owner/TicketListScreen';
-import TicketDetailScreen from '../screens/owner/TicketDetailScreen';
-import EditBookingScreen from '../screens/owner/EditBookingScreen';
+import TicketDetailScreen from '../screens/owner/AllBooking/TicketDetailScreen';
+import EditBookingScreen from '../screens/owner/AllBooking/EditBookingScreen';
 import DeviceInformationScreen from '../screens/owner/DeviceInformationScreen';
 import DeviceMissingPartsScreen from '../screens/owner/DeviceMissingPartsScreen';
 import DeviceSecurityScreen from '../screens/owner/DeviceSecurityScreen';
-import BookingSummaryScreen from '../screens/owner/BookingSummaryScreen';
-import BookingTimelineScreen from '../screens/owner/BookingTimelineScreen';
-import BarcodePrintScreen from '../screens/owner/BarcodePrintScreen';
-import DeliveryInvoiceScreen from '../screens/owner/DeliveryInvoiceScreen';
+import BookingSummaryScreen from '../screens/owner/AllBooking/BookingSummaryScreen';
+import BookingTimelineScreen from '../screens/owner/AllBooking/BookingTimelineScreen';
+import BarcodePrintScreen from '../screens/owner/AllBooking/BarcodePrintScreen';
+import DeliveryInvoiceScreen from '../screens/owner/AllBooking/DeliveryInvoiceScreen';
 import AssignTechnicianScreen from '../screens/owner/AssignTechnicianScreen';
 import InventoryScreen from '../screens/owner/InventoryScreen';
 import MarketplaceBuyScreen from '../screens/owner/MarketplaceBuyScreen';
@@ -50,6 +51,7 @@ import NewBookingScreen from '../screens/owner/serviceBooking/NewBookingScreen';
 import CustomerDetailsScreen from '../screens/owner/serviceBooking/CustomerDetailsScreen';
 import ChooseDeviceScreen from '../screens/owner/serviceBooking/ChooseDeviceScreen';
 import SelectDeviceBrandScreen from '../screens/owner/serviceBooking/SelectDeviceBrandScreen';
+import SelectDeviceSeriesScreen from '../screens/owner/serviceBooking/SelectDeviceSeriesScreen';
 import SelectDeviceModelScreen from '../screens/owner/serviceBooking/SelectDeviceModelScreen';
 import DeviceColorStorageScreen from '../screens/owner/serviceBooking/DeviceColorStorageScreen';
 import DeviceServicesScreen from '../screens/owner/serviceBooking/DeviceServicesScreen';
@@ -63,6 +65,7 @@ import NewAssignTechnicianScreen from '../screens/owner/serviceBooking/AssignTec
 import BookingSuccessfulScreen from '../screens/owner/serviceBooking/BookingSuccessfulScreen';
 import ScanQrCodeScreen from '../screens/owner/serviceBooking/ScanQrCodeScreen';
 import BookingStatusScreen from '../screens/owner/serviceBooking/BookingStatusScreen';
+import ShopServiceStatusScreen from '../screens/owner/ShopServiceStatusScreen';
 import OwnerLeaveRequestsScreen from '../screens/owner/OwnerLeaveRequestsScreen';
 
 const Stack = createNativeStackNavigator();
@@ -151,6 +154,7 @@ export default function OwnerNavigator({ session, onLogout }) {
       <Stack.Screen name="CustomerDetails" component={CustomerDetailsScreen} options={{ title: 'Customer Details', headerShown: false }} />
       <Stack.Screen name="ChooseDevice" component={ChooseDeviceScreen} options={{ title: 'Choose a Device', headerShown: false }} />
       <Stack.Screen name="SelectDeviceBrand" component={SelectDeviceBrandScreen} options={{ title: 'Select Device Brand', headerShown: false }} />
+      <Stack.Screen name="SelectDeviceSeries" component={SelectDeviceSeriesScreen} options={{ title: 'Select Device Series', headerShown: false }} />
       <Stack.Screen name="SelectDeviceModel" component={SelectDeviceModelScreen} options={{ title: 'Select Device Model', headerShown: false }} />
       <Stack.Screen name="DeviceColorStorage" component={DeviceColorStorageScreen} options={{ title: 'Device Color & Storage', headerShown: false }} />
       <Stack.Screen name="DeviceServices" component={DeviceServicesScreen} options={{ title: 'Device Services', headerShown: false }} />
@@ -164,6 +168,7 @@ export default function OwnerNavigator({ session, onLogout }) {
       <Stack.Screen name="BookingSuccessful" component={BookingSuccessfulScreen} options={{ headerShown: false }} />
       <Stack.Screen name="ScanQrCode" component={ScanQrCodeScreen} options={{ headerShown: false }} />
       <Stack.Screen name="BookingStatus" component={BookingStatusScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="ShopServiceStatus" component={ShopServiceStatusScreen} options={{ headerShown: false }} />
       <Stack.Screen name="TicketDetail" component={TicketDetailScreen} options={{ title: 'Booking Details' }} />
       <Stack.Screen name="EditBooking" component={EditBookingScreen} options={{ title: 'Edit Booking' }} />
       <Stack.Screen name="LegacyDeviceInformation" component={DeviceInformationScreen} options={{ title: 'Device Information' }} />

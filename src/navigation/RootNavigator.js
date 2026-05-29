@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { getSession, clearSession } from '../auth/session';
+import { getSession, clearSession, setAuthExpiredHandler } from '../auth/session';
 import { logout } from '../api/auth';
 import { setSession, clearSession as clearAuth } from '../store/authSlice';
 import LoginScreen from '../screens/LoginScreen';
@@ -30,6 +30,15 @@ export default function RootNavigator() {
       dispatch(setSession(s));
       setLoading(false);
     });
+  }, [dispatch]);
+
+  // When the API client detects an expired/invalid token, drop to Login.
+  useEffect(() => {
+    setAuthExpiredHandler(() => {
+      setSessionState(null);
+      dispatch(clearAuth());
+    });
+    return () => setAuthExpiredHandler(null);
   }, [dispatch]);
 
   const handleLogin = (newSession) => {

@@ -47,6 +47,14 @@ export default function BookingStatusScreen({ navigation }) {
           <Pressable><Text className="text-primary font-semibold underline">Previous Report</Text></Pressable>
         </View>
 
+        <Pressable
+          onPress={() => navigation.navigate('ShopServiceStatus')}
+          className="bg-primary rounded-2xl py-3 px-4 mb-4 flex-row items-center justify-center active:opacity-80"
+        >
+          <Ionicons name="create-outline" size={18} color="#fff" />
+          <Text className="text-white font-bold ml-2">Update Customer Service Status</Text>
+        </Pressable>
+
         {loading ? <ActivityIndicator color="#00008B" /> : null}
 
         <View className="flex-row flex-wrap">

@@ -90,7 +90,26 @@ export default function AddressFormScreen({ navigation, route }) {
       navigator.geolocation.getCurrentPosition(
         async (pos) => {
           try {
-            const { latitude, longitude } = pos.coords;
+            const { latitude, longitude, accuracy } = pos.coords;
+
+            // Guard: desktop Chrome without GPS / Wi-Fi positioning falls back
+            // to IP geolocation and returns the ISP's city centre with
+            // accuracy in the tens of kilometres. Saving that would silently
+            // mis-locate the customer forever (and make /shops/nearby return
+            // wrong distances). 5 km is generous — real GPS is <100 m, real
+            // Wi-Fi positioning is <500 m. Anything looser is unusable.
+            const ACCURACY_MAX_METERS = 5000;
+            if (accuracy && accuracy > ACCURACY_MAX_METERS) {
+              setLocating(false);
+              notify(
+                'Location too imprecise',
+                `Your browser only knows you're within ~${Math.round(accuracy / 1000)} km (likely from your IP, not GPS).\n\n` +
+                'Fill the address fields manually so customers get accurate shop distances.\n\n' +
+                'On a phone, the GPS chip gives proper accuracy.',
+              );
+              return;
+            }
+
             // Try Nominatim reverse geocoding (free, no key needed). If blocked, just notify.
             const res = await fetch(
               `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,

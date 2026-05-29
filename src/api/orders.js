@@ -11,6 +11,10 @@ export async function listMyOrders({ orderType, status } = {}) {
 export async function getMyOrder(id) {
   return await orderApi.get(`/customer-orders/${id}`);
 }
+// Checkout the cart into a BUY order (shows in My Orders → Buy tab).
+export async function createBuyOrder({ items, totalAmount }) {
+  return await orderApi.post('/customer-orders/buy', { body: { items, totalAmount } });
+}
 
 // Repair bookings
 export async function createRepairBooking(payload) {
@@ -27,6 +31,15 @@ export async function updateRepairBookingStatus(id, status) {
 }
 export async function rescheduleRepairBooking(id, payload) {
   return await orderApi.post(`/repair-bookings/${id}/reschedule`, { body: payload });
+}
+
+// Shop/owner side: list the shop's customer repair bookings and post a
+// service-timeline status the customer's History screen renders.
+export async function listShopRepairBookings() {
+  return unwrap(await orderApi.get('/repair-bookings/shop'));
+}
+export async function postShopBookingStatus(id, payload) {
+  return await orderApi.post(`/repair-bookings/${id}/shop-status`, { body: payload });
 }
 export async function cancelRepairBooking(id) {
   return await orderApi.post(`/repair-bookings/${id}/cancel`);

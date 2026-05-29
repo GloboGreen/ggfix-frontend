@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import {
   AUTH_BASE,
   MASTER_BASE,
@@ -10,7 +11,7 @@ import {
   ORDER_BASE,
   USER_BASE,
 } from './config';
-import { getToken } from '../auth/session';
+import { getToken, clearSession, notifyAuthExpired } from '../auth/session';
 
 async function request(baseUrlOrNull, method, path, { query, body, headers } = {}) {
   let base = baseUrlOrNull && typeof baseUrlOrNull === 'string' ? baseUrlOrNull.trim() : '';
@@ -56,13 +57,68 @@ async function request(baseUrlOrNull, method, path, { query, body, headers } = {
   }
 
   if (!res.ok) {
-    const message = (json && (json.message || json.error)) || text || `HTTP ${res.status}`;
+    // A 401/403 on a request that DID carry a token means the token is
+    // expired/invalid — clear the stale session and route back to Login.
+    if ((res.status === 401 || res.status === 403) && token) {
+      await clearSession();
+      notifyAuthExpired();
+    }
+    const message = (res.status === 401 || res.status === 403) && token
+      ? 'Your session has expired. Please log in again.'
+      : (json && (json.message || json.error)) || text || `HTTP ${res.status}`;
     const err = new Error(message);
     err.status = res.status;
     err.payload = json;
     throw err;
   }
 
+  return json;
+}
+
+// Multipart file upload. Does NOT set Content-Type so fetch can add the
+// multipart boundary itself. `file` is an expo-image-picker asset { uri }.
+async function uploadRequest(baseUrlOrNull, path, { uri, name, type, fields } = {}) {
+  let base = baseUrlOrNull && typeof baseUrlOrNull === 'string' ? baseUrlOrNull.trim() : '';
+  if (!base || !base.startsWith('http')) base = 'http://localhost:8081/';
+  else if (!base.endsWith('/')) base = base + '/';
+  const urlString = new URL(path, base).toString();
+
+  const form = new FormData();
+  const filename = name || 'upload.jpg';
+  if (Platform.OS === 'web') {
+    // On web the picker gives a blob:/data: URI — fetch it into a real Blob so
+    // FormData produces a valid multipart body (RN's { uri } shape is native-only).
+    const blob = await (await fetch(uri)).blob();
+    form.append('file', blob, filename);
+  } else {
+    form.append('file', { uri, name: filename, type: type || 'image/jpeg' });
+  }
+  if (fields) Object.entries(fields).forEach(([k, v]) => { if (v != null) form.append(k, String(v)); });
+
+  const token = await getToken();
+  let res;
+  try {
+    res = await fetch(urlString, {
+      method: 'POST',
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: form,
+    });
+  } catch (e) {
+    const err = new Error(`Upload failed. URL: ${urlString}. ${e?.message || 'Network request failed'}`);
+    err.status = 0;
+    throw err;
+  }
+
+  const text = await res.text();
+  let json;
+  try { json = text ? JSON.parse(text) : null; } catch { json = null; }
+  if (!res.ok) {
+    if ((res.status === 401 || res.status === 403) && token) { await clearSession(); notifyAuthExpired(); }
+    const message = (json && (json.message || json.error)) || text || `HTTP ${res.status}`;
+    const err = new Error(message);
+    err.status = res.status;
+    throw err;
+  }
   return json;
 }
 
@@ -73,6 +129,7 @@ function createClient(baseUrl) {
     put: (path, opts) => request(baseUrl, 'PUT', path, opts),
     patch: (path, opts) => request(baseUrl, 'PATCH', path, opts),
     del: (path, opts) => request(baseUrl, 'DELETE', path, opts),
+    upload: (path, opts) => uploadRequest(baseUrl, path, opts),
   };
 }
 

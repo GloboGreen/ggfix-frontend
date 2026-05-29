@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { Smartphone, Skull, Cpu, HardDrive, Palette, ChevronRight } from 'lucide-react-native';
 import { BottomActionBar, Input, Label, Badge } from '../../../components/rnr';
 
 const OPTIONS = [
   { key: 'WORKING', label: 'Working Phone', sub: 'Turns on · Calls · No major issues', icon: Smartphone, color: '#10B981', bg: 'bg-success/10', activeBg: 'bg-success/15', border: 'border-success' },
-  { key: 'DEAD',    label: 'Dead / Unknown', sub: "Won't turn on · Heavy damage",       icon: Skull,      color: '#EF4444', bg: 'bg-danger/10',  activeBg: 'bg-danger/15',  border: 'border-danger' },
+  { key: 'DEAD',    label: 'Phone Dead / Unknown', sub: "Won't turn on · Not sure",       icon: Skull,      color: '#EF4444', bg: 'bg-danger/10',  activeBg: 'bg-danger/15',  border: 'border-danger' },
 ];
 
 export default function SellConditionScreen({ navigation, route }) {
@@ -22,8 +22,12 @@ export default function SellConditionScreen({ navigation, route }) {
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 12, paddingBottom: 120 }}>
         {/* Device summary */}
         <View className="bg-card border border-border rounded-xl p-2.5 mb-2.5 flex-row items-center">
-          <View className="h-11 w-11 rounded-xl bg-primary/10 items-center justify-center mr-2.5">
-            <Smartphone size={20} color="#00008B" />
+          <View className="h-11 w-11 rounded-xl bg-primary/10 items-center justify-center mr-2.5 overflow-hidden">
+            {device.imageUrl ? (
+              <Image source={{ uri: device.imageUrl }} style={{ width: 44, height: 44 }} resizeMode="cover" />
+            ) : (
+              <Smartphone size={20} color="#00008B" />
+            )}
           </View>
           <View className="flex-1">
             <Text className="text-[10px] text-text-muted uppercase tracking-widest">Your Device</Text>

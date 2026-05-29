@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { Eye, Trash2, ShoppingCart, ShieldCheck, Truck } from 'lucide-react-native';
+import { Eye, Trash2, ShoppingCart, ShieldCheck, Truck, Minus, Plus } from 'lucide-react-native';
 import {
   Card,
   Loader,
@@ -12,11 +12,16 @@ import {
   Badge,
 } from '../../../components/rnr';
 import { confirm, notify } from '../../../components/confirm';
-import { getCart, removeCartItem } from '../../../api/marketplace';
+import { getCart, removeCartItem, updateCartItem, clearCart } from '../../../api/marketplace';
+import { createBuyOrder } from '../../../api/orders';
+
+const cartTotal = (list) =>
+  list.reduce((sum, it) => sum + (Number(it.product?.price) || 0) * (it.quantity || 1), 0);
 
 export default function MyCartScreen({ navigation }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [placing, setPlacing] = useState(false);
 
   const load = useCallback(async () => {
     try { setItems(await getCart()); } finally { setLoading(false); }
@@ -27,6 +32,36 @@ export default function MyCartScreen({ navigation }) {
     const ok = await confirm({ title: 'Remove', message: 'Remove this item from cart?', confirmText: 'Remove', destructive: true });
     if (!ok) return;
     try { await removeCartItem(id); load(); } catch (e) { notify('Error', e.message); }
+  };
+
+  // Optimistically bump quantity, then persist (min 1).
+  const onQty = async (it, delta) => {
+    const next = Math.max(1, (it.quantity || 1) + delta);
+    if (next === (it.quantity || 1)) return;
+    setItems((prev) => prev.map((x) => (x.id === it.id ? { ...x, quantity: next } : x)));
+    try { await updateCartItem(it.id, next); } catch (e) { notify('Error', e.message || 'Could not update quantity'); load(); }
+  };
+
+  const onCheckout = async () => {
+    if (placing || !items.length) return;
+    setPlacing(true);
+    try {
+      const payloadItems = items.map((it) => ({
+        productId: it.product?.id || it.productId,
+        title: it.product?.title,
+        price: Number(it.product?.price) || 0,
+        quantity: it.quantity || 1,
+      }));
+      await createBuyOrder({ items: payloadItems, totalAmount: cartTotal(items) });
+      await clearCart().catch(() => {});
+      setItems([]);
+      notify('Order placed', 'Your order has been placed. Track it in My Orders.');
+      navigation.navigate('MyOrders');
+    } catch (e) {
+      notify('Checkout failed', e.message || 'Could not place order. Please try again.');
+    } finally {
+      setPlacing(false);
+    }
   };
 
   if (loading) return <Loader label="Loading your cart..." />;
@@ -54,8 +89,12 @@ export default function MyCartScreen({ navigation }) {
           return (
             <Card key={it.id} className="rounded-2xl mb-3">
               <View className="flex-row">
-                <View className="h-24 w-20 rounded-xl bg-primary/10 items-center justify-center mr-3">
-                  <Text style={{ fontSize: 28 }}>📱</Text>
+                <View className="h-24 w-20 rounded-xl bg-primary/10 items-center justify-center mr-3 overflow-hidden">
+                  {p.imageUrl ? (
+                    <Image source={{ uri: p.imageUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                  ) : (
+                    <Text style={{ fontSize: 28 }}>📱</Text>
+                  )}
                 </View>
                 <View className="flex-1">
                   <Text className="text-[14px] font-extrabold text-text" numberOfLines={2}>{p.title}</Text>
@@ -66,11 +105,27 @@ export default function MyCartScreen({ navigation }) {
                     {p.color ? (
                       <Badge variant="muted" className="mr-1.5 mb-1">{p.color}</Badge>
                     ) : null}
-                    <Badge variant="softSuccess">Qty {it.quantity || 1}</Badge>
                   </View>
                   <Text className="text-[16px] font-extrabold text-primary mt-2">
                     ₹{(p.price || 0).toLocaleString?.() || p.price}
                   </Text>
+                  {/* Quantity stepper */}
+                  <View className="flex-row items-center mt-2">
+                    <Pressable
+                      onPress={() => onQty(it, -1)}
+                      disabled={(it.quantity || 1) <= 1}
+                      className={`h-7 w-7 rounded-lg border border-border items-center justify-center ${(it.quantity || 1) <= 1 ? 'opacity-40' : 'active:opacity-70'}`}
+                    >
+                      <Minus size={14} color="#0F172A" />
+                    </Pressable>
+                    <Text className="mx-3 text-[14px] font-extrabold text-text">{it.quantity || 1}</Text>
+                    <Pressable
+                      onPress={() => onQty(it, 1)}
+                      className="h-7 w-7 rounded-lg border border-border items-center justify-center active:opacity-70"
+                    >
+                      <Plus size={14} color="#0F172A" />
+                    </Pressable>
+                  </View>
                 </View>
               </View>
               <View className="flex-row mt-3 -mx-1 pt-2 border-t border-border">
@@ -117,8 +172,8 @@ export default function MyCartScreen({ navigation }) {
         priceCaption="Total"
         priceValue={`₹${total.toLocaleString()}`}
         priceLabel={`${items.length} item${items.length > 1 ? 's' : ''}`}
-        title="Checkout"
-        onPress={() => {}}
+        title={placing ? 'Placing…' : 'Checkout'}
+        onPress={onCheckout}
       />
     </View>
   );

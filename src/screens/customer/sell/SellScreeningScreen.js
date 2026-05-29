@@ -7,11 +7,11 @@ import { getScreeningQuestions } from '../../../api/masterData';
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  qTitle: { fontSize: 14, fontWeight: '700', color: colors.text },
-  qHelp: { fontSize: 12, color: colors.textSecondary, marginTop: 4 },
-  ansRow: { flexDirection: 'row', alignItems: 'center', padding: 12, borderWidth: 1, borderColor: colors.border, borderRadius: 8, marginTop: 8 },
+  qTitle: { fontSize: 13, fontWeight: '700', color: colors.text },
+  qHelp: { fontSize: 11, color: colors.textSecondary, marginTop: 2 },
+  ansRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 10, borderWidth: 1, borderColor: colors.border, borderRadius: 8, marginTop: 6 },
   ansRowActive: { borderColor: '#16A34A' },
-  ansLabel: { marginLeft: 10, fontSize: 14, color: colors.text },
+  ansLabel: { marginLeft: 8, fontSize: 13, color: colors.text },
   bottom: { padding: 12, backgroundColor: '#fff', borderTopColor: colors.border, borderTopWidth: 1 },
 });
 
@@ -25,7 +25,7 @@ export default function SellScreeningScreen({ navigation, route }) {
   useEffect(() => {
     (async () => {
       try {
-        const list = await getScreeningQuestions(flow);
+        const list = await getScreeningQuestions(flow, device?.categoryId);
         const fallback = flow === 'DEAD' ? [
           { id: 'd1', question: 'What is the current condition of your phone?', helperText: '', options: ['Phone Dead (Not powering on)', 'Unknown Condition (Not sure / partially working)'] },
           { id: 'd2', question: "Is your phone's display original?", helperText: 'Choose Yes if never changed.', options: ['Yes', 'No'] },
@@ -47,7 +47,7 @@ export default function SellScreeningScreen({ navigation, route }) {
     <View style={styles.container}>
       <ScrollView contentContainerStyle={{ padding: 12 }}>
         {questions.map((q, i) => (
-          <Card key={q.id}>
+          <Card key={q.id} style={{ padding: 10, marginVertical: 4 }}>
             <Text style={styles.qTitle}>{i + 1}. {q.question}</Text>
             {q.helperText ? <Text style={styles.qHelp}>{q.helperText}</Text> : null}
             {(q.options || ['Yes', 'No']).map((opt) => {
@@ -65,7 +65,8 @@ export default function SellScreeningScreen({ navigation, route }) {
       <View style={styles.bottom}>
         <PrimaryButton
           title="Continue →"
-          onPress={() => navigation.navigate('SellScreenCondition', { device, workingCondition, screeningAnswers: Object.entries(answers).map(([qid, a]) => ({ questionId: qid, answer: a })) })}
+          disabled={questions.some((q) => !answers[q.id])}
+          onPress={() => navigation.navigate('SellScreenCondition', { device, workingCondition, screeningAnswers: questions.filter((q) => answers[q.id]).map((q) => ({ questionId: q.id, answer: answers[q.id], question: q.question })) })}
         />
       </View>
     </View>

@@ -1,20 +1,12 @@
 import React, { useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import {
-  MessageCircle,
-  Truck,
-  Store,
-  ShieldCheck,
-  Sparkles,
-  Clock,
-  IndianRupee,
-  ChevronRight,
-  Wrench,
-  CheckCircle2,
-  Phone,
+  MessageCircle, Truck, Store, ShieldCheck, Clock, IndianRupee,
+  Phone, Wrench, Check,
 } from 'lucide-react-native';
-import { BottomActionBar, Badge } from '../../../components/rnr';
+import { BottomActionBar } from '../../../components/rnr';
+
+const MAX_W = 560;
 
 const OPTIONS = [
   {
@@ -23,15 +15,15 @@ const OPTIONS = [
     title: 'Doorstep Pickup',
     tagline: 'Most popular',
     description: 'Free pickup & drop. Pick a nearby shop and a slot — we handle the rest.',
-    palette: ['#00008B', '#2563EB'],
     accent: '#00008B',
+    bg: 'bg-primary/10',
+    priceClass: 'text-primary',
     icon: Truck,
     badge: 'POPULAR',
-    badgeVariant: 'softWarning',
     highlights: [
       { icon: Truck, label: 'Free pickup' },
       { icon: ShieldCheck, label: '30-day warranty' },
-      { icon: Clock, label: 'Same-day available' },
+      { icon: Clock, label: 'Same-day' },
     ],
     eta: 'Pickup in 30 min',
     price: 'From ₹399',
@@ -43,11 +35,11 @@ const OPTIONS = [
     title: 'Service Enquiry',
     tagline: 'Talk first, book later',
     description: 'Chat with shop technicians to clarify the issue & get a quote before booking.',
-    palette: ['#059669', '#10B981'],
-    accent: '#10B981',
+    accent: '#059669',
+    bg: 'bg-success/10',
+    priceClass: 'text-success',
     icon: MessageCircle,
     badge: 'FREE',
-    badgeVariant: 'softSuccess',
     highlights: [
       { icon: MessageCircle, label: 'Live chat' },
       { icon: Phone, label: 'Call back' },
@@ -60,6 +52,7 @@ const OPTIONS = [
 
 export default function RepairServiceOptionsScreen({ navigation, route }) {
   const params = route.params || {};
+  const centered = { width: '100%', maxWidth: MAX_W, alignSelf: 'center' };
   const [selected, setSelected] = useState('PICKUP');
 
   const onContinue = () => {
@@ -70,39 +63,30 @@ export default function RepairServiceOptionsScreen({ navigation, route }) {
 
   return (
     <View className="flex-1 bg-background">
-      <LinearGradient
-        colors={['#00008B', '#2563EB']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={{ paddingTop: 8, paddingBottom: 24, paddingHorizontal: 16, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 }}
-      >
-        <Text className="text-white/80 text-[11px] font-bold tracking-widest">SERVICE OPTIONS</Text>
-        <Text className="text-white text-[22px] font-extrabold mt-1">How do you want to proceed?</Text>
-        <Text className="text-white/85 text-[12px] mt-1">Choose the option that fits you best.</Text>
-      </LinearGradient>
+      <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 110 }}>
+       <View style={centered}>
 
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 140 }}>
-
-        {/* Device + services summary if present */}
+        {/* Device + services summary */}
         {(params.device || params.services?.length) ? (
-          <View className="bg-card border border-border rounded-2xl p-3 mb-4 -mt-4 flex-row items-center"
-                style={{ shadowColor: '#0F172A', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 3 }}>
-            <View className="h-11 w-11 rounded-2xl bg-primary/10 items-center justify-center mr-3">
-              <Wrench size={20} color="#00008B" />
+          <View className="bg-card border border-border rounded-2xl p-3 mb-3 flex-row items-center">
+            <View className="h-10 w-10 rounded-xl bg-primary/10 items-center justify-center mr-3">
+              <Wrench size={18} color="#00008B" />
             </View>
             <View className="flex-1">
               <Text className="text-[10px] text-text-muted uppercase tracking-widest">Booking for</Text>
-              <Text className="text-[14px] font-extrabold text-text" numberOfLines={1}>
+              <Text className="text-[13px] font-extrabold text-text" numberOfLines={1}>
                 {params.device?.modelName || 'Device'}
               </Text>
               {params.services?.length ? (
-                <Text className="text-[11px] text-text-muted mt-0.5" numberOfLines={1}>
+                <Text className="text-[10px] text-text-muted mt-0.5" numberOfLines={1}>
                   {params.services.length} service{params.services.length === 1 ? '' : 's'} · {params.services.map((s) => s.name).join(', ')}
                 </Text>
               ) : null}
             </View>
           </View>
         ) : null}
+
+        <Text className="text-[11px] font-extrabold text-text-muted tracking-widest mb-2">HOW TO PROCEED</Text>
 
         {OPTIONS.map((opt) => {
           const Icon = opt.icon;
@@ -111,97 +95,74 @@ export default function RepairServiceOptionsScreen({ navigation, route }) {
             <Pressable
               key={opt.key}
               onPress={() => setSelected(opt.key)}
-              className={`bg-card rounded-2xl border mb-4 overflow-hidden active:opacity-90 ${isSelected ? 'border-primary' : 'border-border'}`}
-              style={isSelected
-                ? { shadowColor: opt.accent, shadowOpacity: 0.18, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 5 }
-                : { shadowColor: '#0F172A', shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2 }
-              }
+              className={`bg-card rounded-2xl border p-3.5 mb-2.5 active:opacity-90 ${isSelected ? 'border-primary bg-primary/5' : 'border-border'}`}
             >
-              {/* Gradient header */}
-              <LinearGradient
-                colors={opt.palette}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={{ padding: 16 }}
-              >
-                <View className="flex-row items-start">
-                  <View
-                    className="h-14 w-14 rounded-2xl bg-white items-center justify-center mr-3"
-                    style={{ shadowColor: opt.accent, shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 3 }}
-                  >
-                    <Icon size={26} color={opt.accent} />
-                  </View>
-                  <View className="flex-1">
-                    <View className="flex-row items-center">
-                      <Text className="text-white text-[17px] font-extrabold mr-2">{opt.title}</Text>
-                      {opt.badge ? (
-                        <View className="bg-white/20 rounded-full px-2 py-0.5">
-                          <Text className="text-white text-[9px] font-bold tracking-wide">{opt.badge}</Text>
-                        </View>
-                      ) : null}
-                    </View>
-                    <Text className="text-white/85 text-[11px] mt-0.5 font-semibold">{opt.tagline}</Text>
-                  </View>
-                  {/* Radio indicator */}
-                  <View className={`h-6 w-6 rounded-full border-2 items-center justify-center ${isSelected ? 'border-white bg-white' : 'border-white/50'}`}>
-                    {isSelected ? <View className="h-3 w-3 rounded-full" style={{ backgroundColor: opt.accent }} /> : null}
-                  </View>
+              <View className="flex-row items-start">
+                <View className={`h-10 w-10 rounded-xl items-center justify-center mr-3 ${opt.bg}`}>
+                  <Icon size={20} color={opt.accent} />
                 </View>
-                <Text className="text-white/90 text-[12px] mt-3 leading-5">{opt.description}</Text>
-              </LinearGradient>
-
-              {/* Body */}
-              <View className="px-4 py-3">
-                <View className="flex-row -mx-1">
-                  {opt.highlights.map((h) => {
-                    const HIcon = h.icon;
-                    return (
-                      <View key={h.label} className="flex-1 mx-1 bg-background rounded-xl p-2.5 items-center">
-                        <HIcon size={14} color={opt.accent} />
-                        <Text className="text-[10px] font-bold text-text mt-1 text-center" numberOfLines={1}>{h.label}</Text>
+                <View className="flex-1 pr-2">
+                  <View className="flex-row items-center">
+                    <Text className="text-[15px] font-extrabold text-text mr-2">{opt.title}</Text>
+                    {opt.badge ? (
+                      <View className="bg-background border border-border rounded-full px-2 py-0.5">
+                        <Text className="text-[9px] font-bold text-text-muted tracking-wide">{opt.badge}</Text>
                       </View>
-                    );
-                  })}
+                    ) : null}
+                  </View>
+                  <Text className="text-[12px] text-text-muted mt-1 leading-4">{opt.description}</Text>
+
+                  <View className="flex-row flex-wrap mt-2">
+                    {opt.highlights.map((h) => {
+                      const HIcon = h.icon;
+                      return (
+                        <View key={h.label} className="flex-row items-center mr-3 mb-1">
+                          <HIcon size={11} color={opt.accent} />
+                          <Text className="text-[10px] text-text-muted ml-1">{h.label}</Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+
+                  <View className="flex-row items-center justify-between mt-2 pt-2 border-t border-border">
+                    <View className="flex-row items-center">
+                      <Clock size={11} color="#94A3B8" />
+                      <Text className="text-[11px] text-text-muted ml-1">{opt.eta}</Text>
+                    </View>
+                    <Text className={`text-[13px] font-extrabold ${opt.priceClass}`}>{opt.price}</Text>
+                  </View>
                 </View>
-                <View className="flex-row items-center justify-between mt-3">
-                  <View className="flex-row items-center">
-                    <Clock size={12} color="#64748B" />
-                    <Text className="text-[11px] text-text-muted ml-1">{opt.eta}</Text>
-                  </View>
-                  <View className="flex-row items-center">
-                    <Text className="text-[10px] text-text-muted mr-1">Starts at</Text>
-                    <Text className="text-[14px] font-extrabold" style={{ color: opt.accent }}>{opt.price}</Text>
-                  </View>
+
+                {/* Radio / check */}
+                <View className={`h-6 w-6 rounded-full items-center justify-center ${isSelected ? 'bg-primary' : 'border-2 border-border'}`}>
+                  {isSelected ? <Check size={14} color="#fff" strokeWidth={3} /> : null}
                 </View>
               </View>
             </Pressable>
           );
         })}
 
-        {/* Walk-in suggestion (subtle) */}
-        <View className="bg-card border border-border rounded-2xl p-3 flex-row items-center"
-              style={{ shadowColor: '#0F172A', shadowOpacity: 0.03, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 1 }}>
-          <View className="h-10 w-10 rounded-full bg-background items-center justify-center mr-3">
-            <Store size={18} color="#64748B" />
+        {/* Walk-in (subtle) */}
+        <Pressable
+          onPress={() => navigation.navigate('NearbyShops')}
+          className="bg-card border border-border rounded-2xl p-3 flex-row items-center active:opacity-80"
+        >
+          <View className="h-9 w-9 rounded-full bg-background items-center justify-center mr-3">
+            <Store size={16} color="#64748B" />
           </View>
           <View className="flex-1">
             <Text className="text-[13px] font-bold text-text">Walk-in to a shop</Text>
-            <Text className="text-[11px] text-text-muted mt-0.5">Find shops on the map and visit directly. No appointment needed.</Text>
+            <Text className="text-[10px] text-text-muted mt-0.5" numberOfLines={1}>Find shops on the map & visit directly.</Text>
           </View>
-          <Pressable
-            onPress={() => navigation.navigate('NearbyShops')}
-            className="bg-background border border-border rounded-full px-3 py-1.5 active:opacity-70"
-          >
+          <View className="bg-background border border-border rounded-full px-3 py-1.5">
             <Text className="text-[11px] font-bold text-text">Find</Text>
-          </Pressable>
-        </View>
+          </View>
+        </Pressable>
 
-        <View className="bg-primary/5 border border-primary/10 rounded-2xl p-3 mt-4 flex-row items-center">
-          <Sparkles size={14} color="#00008B" />
-          <Text className="text-[11px] text-text-muted ml-2 flex-1">
-            Both options support 30-day warranty and verified shops.
-          </Text>
-        </View>
+        <Text className="text-[10px] text-text-muted text-center mt-3">
+          Both options include 30-day warranty & verified shops.
+        </Text>
+       </View>
       </ScrollView>
 
       <BottomActionBar
