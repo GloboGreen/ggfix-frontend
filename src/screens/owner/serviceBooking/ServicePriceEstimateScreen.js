@@ -1,24 +1,35 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TextInput, Pressable } from 'react-native';
+import { View, Text, ScrollView, TextInput, Pressable, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Button, Card, Checkbox, FormField, ScreenHeader, Select } from '../../../components/rnr';
 
 const DURATIONS = [1, 2, 3, 4, 5, 6, 8, 12, 24, 48].map((h) => ({ value: h, label: `${h} - Hr` }));
+
+const formatDate = (d) => d.toDateString(); // e.g. "Sat May 30 2026"
+const formatTime = (d) => {
+  let h = d.getHours();
+  const m = d.getMinutes().toString().padStart(2, '0');
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return `${h}.${m} ${ampm}`;
+};
 
 export default function ServicePriceEstimateScreen({ navigation, route }) {
   const params = route?.params || {};
   const services = params.services || [];
   const total = services.reduce((sum, s) => sum + (Number(s.price) || 0), 0);
 
-  const today = new Date();
-  const todayLabel = today.toDateString().slice(0, 15);
+  // Lock "now" at mount so the displayed date/time and delivery calc are stable.
+  const [now] = useState(() => new Date());
   const [imei, setImei] = useState('');
   const [complaint, setComplaint] = useState('');
-  const [date, setDate] = useState(todayLabel);
-  const [time, setTime] = useState('6.30 PM');
   const [duration, setDuration] = useState(2);
   const [approval, setApproval] = useState(true);
-  const deliveryLabel = `${date} - 8.30 PM`;
+
+  const dateLabel = formatDate(now);
+  const timeLabel = formatTime(now);
+  const delivery = new Date(now.getTime() + duration * 60 * 60 * 1000);
+  const deliveryLabel = `${formatDate(delivery)} - ${formatTime(delivery)}`;
 
   const onContinue = () => {
     if (!complaint.trim()) return;
@@ -26,8 +37,11 @@ export default function ServicePriceEstimateScreen({ navigation, route }) {
       ...params,
       imei: imei.trim(),
       complaint: complaint.trim(),
-      estimatedAt: `${date} ${time}, ${duration}Hr`,
+      estimatedAt: `${dateLabel} ${timeLabel}, ${duration}Hr`,
       estimatedDelivery: deliveryLabel,
+      estimatedReadyIso: now.toISOString(),
+      estimatedDeliveryIso: delivery.toISOString(),
+      durationHours: duration,
       customerApproved: approval,
     });
   };
@@ -37,7 +51,13 @@ export default function ServicePriceEstimateScreen({ navigation, route }) {
       <ScreenHeader title="Service Price, Issue & Estimated Time" onBack={() => navigation.goBack()} />
       <ScrollView contentContainerClassName="px-4 pt-4 pb-32" keyboardShouldPersistTaps="handled">
         <Card className="flex-row items-center mb-4">
-          <View className="w-14 h-16 bg-border rounded-md" />
+          <View className="w-14 h-16 bg-border rounded-md overflow-hidden items-center justify-center">
+            {params.imageUrl ? (
+              <Image source={{ uri: params.imageUrl }} style={{ width: 56, height: 64 }} resizeMode="cover" />
+            ) : (
+              <Ionicons name="phone-portrait-outline" size={24} color="#64748B" />
+            )}
+          </View>
           <View className="ml-3 flex-1">
             <Text className="text-text-muted text-xs">Device: <Text className="font-bold text-text">{params.modelName || ''} ({params.ramLabel || ''} {params.storageLabel || ''})</Text></Text>
             <Text className="text-text-muted text-xs mt-1">Color : <Text className="font-bold text-text">{params.color}</Text></Text>
@@ -92,16 +112,14 @@ export default function ServicePriceEstimateScreen({ navigation, route }) {
           <View className="flex-row">
             <View className="flex-1 mr-2">
               <Text className="text-xs text-text-muted mb-1">Date</Text>
-              <View className="bg-card border border-border rounded-xl px-3 py-2 flex-row items-center justify-between">
-                <Text className="text-text text-xs flex-1">{date}</Text>
-                <Ionicons name="chevron-down" size={14} color="#64748B" />
+              <View className="bg-background border border-border rounded-xl px-3 py-2">
+                <Text className="text-text text-xs">{dateLabel}</Text>
               </View>
             </View>
             <View className="flex-1 mr-2">
               <Text className="text-xs text-text-muted mb-1">Time</Text>
-              <View className="bg-card border border-border rounded-xl px-3 py-2 flex-row items-center justify-between">
-                <Text className="text-text text-xs flex-1">{time}</Text>
-                <Ionicons name="chevron-down" size={14} color="#64748B" />
+              <View className="bg-background border border-border rounded-xl px-3 py-2">
+                <Text className="text-text text-xs">{timeLabel}</Text>
               </View>
             </View>
             <View className="w-24">

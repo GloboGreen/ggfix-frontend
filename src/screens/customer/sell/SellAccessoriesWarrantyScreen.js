@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../../../theme/colors';
@@ -17,10 +17,13 @@ const styles = StyleSheet.create({
   bottom: { padding: 12, backgroundColor: '#fff', borderTopColor: colors.border, borderTopWidth: 1 },
 });
 
-const ACCESSORIES = [
+const MOBILE_ACCESSORIES = [
   { id: 'original_charger', label: 'Original Charger', icon: 'flash-outline' },
   { id: 'battery_local', label: 'Battery Replaced From Local Market', icon: 'battery-charging-outline' },
   { id: 'flashlight_not_working', label: 'Flash Light Not Working', icon: 'flashlight-outline' },
+];
+const LAPTOP_ACCESSORIES = [
+  { id: 'original_charger', label: 'Original Charger', icon: 'flash-outline' },
 ];
 
 const WARRANTY = [
@@ -30,10 +33,23 @@ const WARRANTY = [
   { id: 'gt_11', label: 'More then 11 months' },
 ];
 
+// Laptop/audio/watch sell flows don't carry a warranty option.
+const NO_WARRANTY_KEYWORDS = ['LAPTOP', 'AUDIO', 'WATCH', 'HEADPHONE', 'EARBUD', 'TABLET'];
+
 export default function SellAccessoriesWarrantyScreen({ navigation, route }) {
   const params = route.params || {};
+  const categoryCode = String(params.device?.categoryCode || '').toUpperCase();
+  const isLaptopLike = NO_WARRANTY_KEYWORDS.some((k) => categoryCode.includes(k));
+  const ACCESSORIES = isLaptopLike ? LAPTOP_ACCESSORIES : MOBILE_ACCESSORIES;
+
   const [accessories, setAccessories] = useState([]);
   const [warranty, setWarranty] = useState(null);
+
+  useEffect(() => {
+    if (isLaptopLike) {
+      navigation.setOptions?.({ title: 'Accessoires' });
+    }
+  }, [isLaptopLike, navigation]);
 
   const toggleAcc = (id) =>
     setAccessories((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
@@ -56,29 +72,31 @@ export default function SellAccessoriesWarrantyScreen({ navigation, route }) {
           </View>
         </Card>
 
-        <Card style={{ padding: 10, marginVertical: 4 }}>
-          <Text style={styles.sectionTitle}>Warranty</Text>
-          {WARRANTY.map((w) => {
-            const active = warranty === w.id;
-            return (
-              <TouchableOpacity key={w.id} style={[styles.warrantyRow, active && styles.warrantyRowActive]} onPress={() => setWarranty(w.id)}>
-                <Ionicons name={active ? 'checkmark-circle' : 'radio-button-off'} size={22} color={active ? '#16A34A' : colors.textSecondary} />
-                <Text style={styles.warrantyLabel}>{w.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </Card>
+        {!isLaptopLike ? (
+          <Card style={{ padding: 10, marginVertical: 4 }}>
+            <Text style={styles.sectionTitle}>Warranty</Text>
+            {WARRANTY.map((w) => {
+              const active = warranty === w.id;
+              return (
+                <TouchableOpacity key={w.id} style={[styles.warrantyRow, active && styles.warrantyRowActive]} onPress={() => setWarranty(w.id)}>
+                  <Ionicons name={active ? 'checkmark-circle' : 'radio-button-off'} size={22} color={active ? '#16A34A' : colors.textSecondary} />
+                  <Text style={styles.warrantyLabel}>{w.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </Card>
+        ) : null}
       </ScrollView>
       <View style={styles.bottom}>
         <PrimaryButton
           title="Continue →"
-          disabled={!warranty}
+          disabled={!isLaptopLike && !warranty}
           onPress={() =>
             navigation.navigate('SellImages', {
               ...params,
               accessories: accessories.map((id) => ({ accessoryCode: id, label: ACCESSORIES.find((a) => a.id === id)?.label })),
-              warranty,
-              warrantyLabel: WARRANTY.find((w) => w.id === warranty)?.label,
+              warranty: isLaptopLike ? null : warranty,
+              warrantyLabel: isLaptopLike ? null : WARRANTY.find((w) => w.id === warranty)?.label,
             })
           }
         />

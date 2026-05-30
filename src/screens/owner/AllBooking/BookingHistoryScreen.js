@@ -1,5 +1,5 @@
 ﻿import React, { useCallback, useMemo, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
+import { FlatList, Image, Pressable, RefreshControl, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import {
@@ -19,6 +19,7 @@ import {
   Chip,
 } from '../../../components/rnr';
 import { ticketApi } from '../../../api/client';
+import { getModelsByBrand } from '../../../api/masterData';
 
 const STATUS_VARIANT = {
   CREATED:           { variant: 'softWarning', label: 'Service Accepted' },
@@ -69,7 +70,29 @@ export default function BookingHistoryScreen({ navigation }) {
           },
         });
         const content = Array.isArray(data) ? data : data?.content ?? data?.data ?? [];
-        setItems(content);
+        // Enrich each ticket with the model's catalog image and proper name —
+        // tickets don't always carry deviceImageUrl / deviceDisplayName, but we
+        // have brandId+modelId on every row.
+        const brandIds = Array.from(new Set(content.map((t) => t.brandId).filter(Boolean)));
+        const modelById = {};
+        if (brandIds.length) {
+          await Promise.all(brandIds.map(async (bId) => {
+            try {
+              const models = await getModelsByBrand(bId);
+              (models || []).forEach((m) => { modelById[m.id] = m; });
+            } catch (_) {}
+          }));
+        }
+        const enriched = content.map((t) => {
+          const m = t.modelId ? modelById[t.modelId] : null;
+          const modelUrl = m?.imageUrl || (m?.imageBase64 ? `data:image/png;base64,${m.imageBase64}` : null);
+          return {
+            ...t,
+            _modelName: m?.name || t.deviceDisplayName || t.modelName || null,
+            _modelImage: t.deviceImageUrl || modelUrl || null,
+          };
+        });
+        setItems(enriched);
       } catch (e) {
         setError(e.message || 'Failed to load bookings');
       } finally {
@@ -88,12 +111,13 @@ export default function BookingHistoryScreen({ navigation }) {
   }), [items]);
 
   const renderItem = ({ item }) => {
-    const deviceName = item.deviceModelName || item.modelName || 'Device';
+    const deviceName = item._modelName || item.deviceDisplayName || item.deviceModelName || item.modelName || 'Device';
+    const deviceImage = item._modelImage || item.deviceImageUrl || null;
     const color = item.color;
-    const trackingId = item.trackingId || (item.id ? item.id.slice(0, 8).toUpperCase() : 'â€”');
+    const trackingId = item.trackingId || (item.id ? item.id.slice(0, 8).toUpperCase() : '-');
     const statusMeta = STATUS_VARIANT[String(item.status || '').toUpperCase()] || { variant: 'softPrimary', label: item.status || 'Pending' };
-    const customerName = item.customerName || 'â€”';
-    const phone = item.customerPhone || '';
+    const customerName = item.customerName || item.customerFullName || item.customer?.name || '-';
+    const phone = item.customerPhone || item.customer?.phone || '';
     const services = item.repairServicesSummary || (item.services?.map?.((s) => s.serviceName).join(', ')) || '';
 
     return (
@@ -103,11 +127,15 @@ export default function BookingHistoryScreen({ navigation }) {
         style={{ shadowColor: '#0F172A', shadowOpacity: 0.04, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 1 }}
       >
         <View className="flex-row items-start mb-1.5">
-          <View className="h-10 w-10 rounded-xl bg-primary/10 items-center justify-center mr-2.5">
-            <Smartphone size={18} color="#00008B" />
+          <View className="h-10 w-10 rounded-xl bg-primary/10 items-center justify-center mr-2.5 overflow-hidden">
+            {deviceImage ? (
+              <Image source={{ uri: deviceImage }} style={{ width: 40, height: 40 }} resizeMode="cover" />
+            ) : (
+              <Smartphone size={18} color="#00008B" />
+            )}
           </View>
           <View className="flex-1 pr-2">
-            <Text className="text-[11px] text-text-muted">Tracking Â· <Text className="text-text font-bold">{trackingId}</Text></Text>
+            <Text className="text-[11px] text-text-muted">Tracking · <Text className="text-text font-bold">{trackingId}</Text></Text>
             <Text className="text-[13px] font-extrabold text-text mt-0.5" numberOfLines={1}>{deviceName}</Text>
             {color ? <Text className="text-[11px] text-text-muted mt-0.5">Color: {color}</Text> : null}
           </View>

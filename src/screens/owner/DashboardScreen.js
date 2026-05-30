@@ -9,6 +9,7 @@ import {
   HelpCircle,
   Users,
   ShoppingBag,
+  Tag,
   CheckCircle2,
   UserCheck,
   Wrench,
@@ -169,7 +170,8 @@ export default function DashboardScreen({ navigation }) {
             { key: 'Reports',      label: 'Sales Report',      icon: BarChart3, color: '#10B981', bg: '#D1FAE5' },
             { key: '_enquiry',     label: 'Enquiry',           icon: HelpCircle, color: '#F59E0B', bg: '#FEF3C7' },
             { key: 'OwnerEmployeeList', label: 'Employees',    icon: Users,     color: '#7C3AED', bg: '#EDE9FE', via: 'parent' },
-            { key: 'BuySell',      label: 'Buy / Sell',        icon: ShoppingBag, color: '#EC4899', bg: '#FCE7F3' },
+            { key: 'Buy',          label: 'Buy',               icon: ShoppingBag, color: '#EC4899', bg: '#FCE7F3' },
+            { key: 'Sell',         label: 'Sell',              icon: Tag,         color: '#10B981', bg: '#D1FAE5' },
           ].map((t) => {
             const Icon = t.icon;
             return (

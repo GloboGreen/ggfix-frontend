@@ -58,6 +58,7 @@ import SellConditionScreen from '../screens/customer/sell/SellConditionScreen';
 import SellScreeningScreen from '../screens/customer/sell/SellScreeningScreen';
 import SellScreenConditionScreen from '../screens/customer/sell/SellScreenConditionScreen';
 import SellFunctionalScreen from '../screens/customer/sell/SellFunctionalScreen';
+import SellDeviceConfigScreen from '../screens/customer/sell/SellDeviceConfigScreen';
 import SellAccessoriesWarrantyScreen from '../screens/customer/sell/SellAccessoriesWarrantyScreen';
 import SellImagesScreen from '../screens/customer/sell/SellImagesScreen';
 import SellAddressScreen from '../screens/customer/sell/SellAddressScreen';
@@ -178,7 +179,7 @@ export default function CustomerNavigator({ session, onLogout }) {
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
 
       {/* Device wizard */}
-      <Stack.Screen name="SelectCategory" component={SelectCategoryScreen} options={{ title: 'Select Category' }} />
+      <Stack.Screen name="SelectCategory" component={SelectCategoryScreen} options={{ headerShown: false }} />
       <Stack.Screen name="SelectBrand" component={SelectBrandScreen} options={{ title: 'Select Brand' }} />
       <Stack.Screen name="SelectSeries" component={SelectSeriesScreen} options={{ title: 'Select Series' }} />
       <Stack.Screen name="SelectModel" component={SelectModelScreen} options={{ title: 'Select Model' }} />
@@ -208,6 +209,7 @@ export default function CustomerNavigator({ session, onLogout }) {
       <Stack.Screen name="SellScreening" component={SellScreeningScreen} options={{ title: 'Screening Question' }} />
       <Stack.Screen name="SellScreenCondition" component={SellScreenConditionScreen} options={{ title: 'Screen' }} />
       <Stack.Screen name="SellFunctional" component={SellFunctionalScreen} options={{ title: 'Functional' }} />
+      <Stack.Screen name="SellDeviceConfig" component={SellDeviceConfigScreen} options={{ title: 'Device Configuration' }} />
       <Stack.Screen name="SellAccessoriesWarranty" component={SellAccessoriesWarrantyScreen} options={{ title: 'Accessoires & Warranty' }} />
       <Stack.Screen name="SellImages" component={SellImagesScreen} options={{ title: 'Sell Device Images' }} />
       <Stack.Screen name="SellAddress" component={SellAddressScreen} options={{ title: 'Select Address' }} />

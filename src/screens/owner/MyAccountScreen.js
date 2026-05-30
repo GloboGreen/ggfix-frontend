@@ -63,6 +63,11 @@ export default function MyAccountScreen({ onLogout, navigation }) {
           onPress={() => navigation?.navigate?.('OwnerPickupOptions')}
         />
         <MenuItem
+          icon={<MaterialCommunityIcons name="package-variant-closed" size={22} color="#0F172A" />}
+          label="My Orders"
+          onPress={() => navigation?.navigate?.('MarketplaceOrders')}
+        />
+        <MenuItem
           icon={<MaterialCommunityIcons name="account-group-outline" size={22} color="#0F172A" />}
           label="Employee Management"
           onPress={() => navigation?.navigate?.('OwnerEmployeeList')}

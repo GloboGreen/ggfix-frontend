@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, Text, View } from 'react-native';
 import {
   Smartphone,
   Cpu,
@@ -95,8 +95,12 @@ export default function DeviceColorStorageScreen({ navigation, route }) {
         {/* Device summary */}
         <View className="bg-card border border-border rounded-2xl p-3 mb-4 flex-row items-center"
               style={{ shadowColor: '#0F172A', shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 1 }}>
-          <View className="h-14 w-14 rounded-2xl bg-primary/10 items-center justify-center mr-3">
-            <Smartphone size={26} color="#00008B" />
+          <View className="h-14 w-14 rounded-2xl bg-primary/10 items-center justify-center mr-3 overflow-hidden">
+            {params.imageUrl ? (
+              <Image source={{ uri: params.imageUrl }} style={{ width: 56, height: 56 }} resizeMode="cover" />
+            ) : (
+              <Smartphone size={26} color="#00008B" />
+            )}
           </View>
           <View className="flex-1">
             <Text className="text-[11px] text-text-muted uppercase tracking-widest">Device Model</Text>

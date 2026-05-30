@@ -105,6 +105,13 @@ export async function getRepairCategories() {
   return unwrap(await masterApi.get('/master/repair-categories'));
 }
 
+// Sell Flow → Device Configuration: returns [{ id, name, code, options:[{id,value}] }, ...]
+export async function getConfigFields(deviceCategoryId) {
+  return unwrap(await masterApi.get('/master/config-fields', {
+    query: isUuid(deviceCategoryId) ? { deviceCategoryId } : undefined,
+  }));
+}
+
 // Sell flow master data — all category-aware: pass the device's category UUID
 // to get that category's list (items with no category are shared/returned too).
 export async function getScreeningQuestions(flow, deviceCategoryId) {

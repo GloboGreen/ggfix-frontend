@@ -1,5 +1,5 @@
 ﻿import React from 'react';
-import { Pressable, ScrollView, Share, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -11,7 +11,6 @@ import {
   Phone,
   BadgeCheck,
   Home,
-  Share2,
 } from 'lucide-react-native';
 import { Button, Card, CardTitle, Badge } from '../../../components/rnr';
 
@@ -41,24 +40,6 @@ export default function RepairConfirmationScreen({ navigation, route }) {
     : '-';
   const scheduledText = `${booking.pickupDate || ''} · ${String(booking.pickupSlotStart || '').slice(0, 5)} - ${String(booking.pickupSlotEnd || '').slice(0, 5)}`;
 
-  const shareReceipt = async () => {
-    const lines = [
-      'GGFIX - Booking Confirmed',
-      booking.bookingNumber ? `Booking #: ${booking.bookingNumber}` : null,
-      `Device: ${deviceName}${deviceSpecs ? ` (${deviceSpecs})` : ''}`,
-      `Repair: ${services.map((s) => s.name).join(', ') || '-'}`,
-      `Pickup: ${addressText}`,
-      `Scheduled: ${scheduledText}`,
-      shop?.name ? `Shop: ${shop.name}` : null,
-      shop?.address ? `Address: ${shop.address}` : null,
-      shop?.phone ? `Phone: ${shop.phone}` : null,
-      `Status: ${(booking.status || 'ORDER_PLACED').replace(/_/g, ' ')}`,
-    ].filter(Boolean);
-    try {
-      await Share.share({ title: 'Booking Receipt', message: lines.join('\n') });
-    } catch (_) {}
-  };
-
   return (
     <View className="flex-1 bg-background">
       <SafeAreaView edges={['top']} style={{ backgroundColor: '#10B981' }}>
@@ -84,12 +65,6 @@ export default function RepairConfirmationScreen({ navigation, route }) {
             </View>
           ) : null}
 
-          <Pressable
-            onPress={shareReceipt}
-            className="absolute right-4 top-2 h-10 w-10 rounded-full bg-white/20 items-center justify-center active:opacity-80"
-          >
-            <Share2 size={18} color="#fff" />
-          </Pressable>
         </LinearGradient>
       </SafeAreaView>
 
@@ -123,14 +98,6 @@ export default function RepairConfirmationScreen({ navigation, route }) {
       </ScrollView>
 
       <View className="px-4 pb-6 pt-3 bg-card border-t border-border" style={{ shadowColor: '#0F172A', shadowOpacity: 0.08, shadowRadius: 12, shadowOffset: { width: 0, height: -4 }, elevation: 12 }}>
-        <Button
-          variant="outline"
-          className="w-full mb-2.5"
-          onPress={shareReceipt}
-          leftIcon={<Share2 size={16} color="#00008B" />}
-        >
-          Share Receipt
-        </Button>
         <View className="flex-row">
           <Button
             variant="outline"

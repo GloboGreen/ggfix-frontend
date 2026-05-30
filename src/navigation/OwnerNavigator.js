@@ -2,7 +2,7 @@ import React from 'react';
 import { View } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { LayoutGrid, FileText, Receipt, ShoppingBag, UserCircle } from 'lucide-react-native';
+import { LayoutGrid, FileText, Receipt, ShoppingBag, Tag, UserCircle } from 'lucide-react-native';
 import colors from '../theme/colors';
 import BackButton from '../components/BackButton';
 import DashboardScreen from '../screens/owner/DashboardScreen';
@@ -25,6 +25,26 @@ import AssignTechnicianScreen from '../screens/owner/AssignTechnicianScreen';
 import InventoryScreen from '../screens/owner/InventoryScreen';
 import MarketplaceBuyScreen from '../screens/owner/MarketplaceBuyScreen';
 import MarketplaceSellScreen from '../screens/owner/MarketplaceSellScreen';
+import OwnerSellSparePartsScreen from '../screens/owner/OwnerSellSparePartsScreen';
+import OwnerSellMobileChoiceScreen from '../screens/owner/OwnerSellMobileChoiceScreen';
+import OwnerSellChooseSalesCategoryScreen from '../screens/owner/OwnerSellChooseSalesCategoryScreen';
+import OwnerSellGadgetPriceScreen from '../screens/owner/OwnerSellGadgetPriceScreen';
+import OwnerSellListedScreen from '../screens/owner/OwnerSellListedScreen';
+import MarketplaceOrdersScreen from '../screens/owner/MarketplaceOrdersScreen';
+import MarketplaceListingDetailsScreen from '../screens/owner/MarketplaceListingDetailsScreen';
+// Reuse customer device pickers for the owner sell mobile flow.
+import SelectCategoryScreen from '../screens/customer/device/SelectCategoryScreen';
+import SelectBrandScreen from '../screens/customer/device/SelectBrandScreen';
+import SelectSeriesScreen from '../screens/customer/device/SelectSeriesScreen';
+import SelectModelScreen from '../screens/customer/device/SelectModelScreen';
+import SelectVariantScreen from '../screens/customer/device/SelectVariantScreen';
+// Reuse customer sell flow screens for the owner-list (Detailed / Dead Short) paths.
+import SellScreeningScreen from '../screens/customer/sell/SellScreeningScreen';
+import SellScreenConditionScreen from '../screens/customer/sell/SellScreenConditionScreen';
+import SellFunctionalScreen from '../screens/customer/sell/SellFunctionalScreen';
+import SellDeviceConfigScreen from '../screens/customer/sell/SellDeviceConfigScreen';
+import SellAccessoriesWarrantyScreen from '../screens/customer/sell/SellAccessoriesWarrantyScreen';
+import SellImagesScreen from '../screens/customer/sell/SellImagesScreen';
 import PickupRequestsScreen from '../screens/owner/PickupRequestsScreen';
 import ReportsScreen from '../screens/owner/ReportsScreen';
 import OwnerPersonalInfoScreen from '../screens/owner/OwnerPersonalInfoScreen';
@@ -75,7 +95,8 @@ const OWNER_TAB_ICONS = {
   Home: LayoutGrid,
   Bookings: FileText,
   Billing: Receipt,
-  BuySell: ShoppingBag,
+  Buy: ShoppingBag,
+  Sell: Tag,
   MyAccount: UserCircle,
 };
 
@@ -124,7 +145,13 @@ function OwnerTabs({ onLogout }) {
       </Tab.Screen>
       <Tab.Screen name="Bookings" component={BookingHistoryScreen} />
       <Tab.Screen name="Billing" component={BillingScreen} />
-      <Tab.Screen name="BuySell" component={BuyScreen} />
+      <Tab.Screen name="Buy" component={BuyScreen} options={{ title: 'Buy' }} />
+      <Tab.Screen
+        name="Sell"
+        component={SelectCategoryScreen}
+        options={{ title: 'Sell' }}
+        initialParams={{ flow: 'OWNER_LIST' }}
+      />
       <Tab.Screen name="MyAccount" options={{ title: 'My Account' }}>
         {(props) => <MyAccountScreen {...props} onLogout={onLogout} />}
       </Tab.Screen>
@@ -180,6 +207,26 @@ export default function OwnerNavigator({ session, onLogout }) {
       <Stack.Screen name="DeliveryInvoice" component={DeliveryInvoiceScreen} options={{ title: 'Deliver Invoice' }} />
       <Stack.Screen name="LegacyAssignTechnician" component={AssignTechnicianScreen} options={{ title: 'Assign Technician' }} />
       <Stack.Screen name="MarketplaceSell" component={MarketplaceSellScreen} options={{ title: 'Sell' }} />
+      <Stack.Screen name="OwnerSellMobile" component={OwnerSellMobileChoiceScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="OwnerSellSpareParts" component={OwnerSellSparePartsScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="OwnerSellChooseSalesCategory" component={OwnerSellChooseSalesCategoryScreen} options={{ headerShown: false }} />
+      {/* Shared device pickers (also registered in the customer stack). */}
+      <Stack.Screen name="SelectCategory" component={SelectCategoryScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="SelectBrand" component={SelectBrandScreen} options={{ title: 'Select Brand' }} />
+      <Stack.Screen name="SelectSeries" component={SelectSeriesScreen} options={{ title: 'Select Series' }} />
+      <Stack.Screen name="SelectModel" component={SelectModelScreen} options={{ title: 'Select Model' }} />
+      <Stack.Screen name="SelectVariant" component={SelectVariantScreen} options={{ title: 'Your Device' }} />
+      {/* Shared sell-flow screens (also registered in the customer stack). */}
+      <Stack.Screen name="SellScreening" component={SellScreeningScreen} options={{ title: 'Screening Question' }} />
+      <Stack.Screen name="SellScreenCondition" component={SellScreenConditionScreen} options={{ title: 'Screen' }} />
+      <Stack.Screen name="SellFunctional" component={SellFunctionalScreen} options={{ title: 'Functional' }} />
+      <Stack.Screen name="SellDeviceConfig" component={SellDeviceConfigScreen} options={{ title: 'Device Configuration' }} />
+      <Stack.Screen name="SellAccessoriesWarranty" component={SellAccessoriesWarrantyScreen} options={{ title: 'Accessoires & Warranty' }} />
+      <Stack.Screen name="SellImages" component={SellImagesScreen} options={{ title: 'Sell Device Images' }} />
+      <Stack.Screen name="OwnerSellGadgetPrice" component={OwnerSellGadgetPriceScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="OwnerSellListed" component={OwnerSellListedScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="MarketplaceOrders" component={MarketplaceOrdersScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="MarketplaceListingDetails" component={MarketplaceListingDetailsScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Reports" component={ReportsScreen} options={{ title: 'Reports' }} />
       <Stack.Screen name="OwnerPersonalInfo" component={OwnerPersonalInfoScreen} options={{ title: 'My Profile' }} />
       <Stack.Screen name="OwnerShopInfo" component={OwnerShopInfoScreen} options={{ title: 'Shop Information' }} />

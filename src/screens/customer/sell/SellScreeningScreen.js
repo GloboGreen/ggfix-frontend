@@ -16,7 +16,8 @@ const styles = StyleSheet.create({
 });
 
 export default function SellScreeningScreen({ navigation, route }) {
-  const { device, workingCondition } = route.params || {};
+  const params = route.params || {};
+  const { device, workingCondition } = params;
   const flow = workingCondition === 'DEAD' ? 'DEAD' : 'WORKING';
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState({});
@@ -66,7 +67,7 @@ export default function SellScreeningScreen({ navigation, route }) {
         <PrimaryButton
           title="Continue →"
           disabled={questions.some((q) => !answers[q.id])}
-          onPress={() => navigation.navigate('SellScreenCondition', { device, workingCondition, screeningAnswers: questions.filter((q) => answers[q.id]).map((q) => ({ questionId: q.id, answer: answers[q.id], question: q.question })) })}
+          onPress={() => navigation.navigate('SellScreenCondition', { ...params, device, workingCondition, screeningAnswers: questions.filter((q) => answers[q.id]).map((q) => ({ questionId: q.id, answer: answers[q.id], question: q.question })) })}
         />
       </View>
     </View>

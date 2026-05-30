@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable, TextInput, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
@@ -11,6 +11,19 @@ export default function NewBookingScreen({ navigation }) {
   const [q, setQ] = useState('');
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState([]);
+
+  // Backend can return the same person more than once (multiple legacy rows for
+  // the same phone). Collapse them by name+phone so the search list shows one
+  // row per real customer.
+  const dedupedResults = useMemo(() => {
+    const byKey = new Map();
+    for (const c of results) {
+      const phone = String(c.phone || c.mobile || '').replace(/\s|\+|-/g, '');
+      const key = `${String(c.name || '').toLowerCase().trim()}|${phone}`;
+      if (!byKey.has(key)) byKey.set(key, c);
+    }
+    return Array.from(byKey.values());
+  }, [results]);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,7 +69,7 @@ export default function NewBookingScreen({ navigation }) {
         </View>
 
         <View className="mt-4">
-          {results.map((c) => (
+          {dedupedResults.map((c) => (
             <Card key={c.id} className="mb-3 flex-row items-center">
               <Avatar fallback={(c.name || '?').slice(0, 2)} size={48} />
               <View className="flex-1 ml-3">
@@ -69,7 +82,7 @@ export default function NewBookingScreen({ navigation }) {
               </Button>
             </Card>
           ))}
-          {!loading && q.trim() && results.length === 0 ? (
+          {!loading && q.trim() && dedupedResults.length === 0 ? (
             <Text className="text-center text-text-muted py-6">No matching customers</Text>
           ) : null}
         </View>

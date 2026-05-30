@@ -1,59 +1,114 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TextInput } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, Text, ScrollView, TextInput, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Button, Checkbox, ScreenHeader } from '../../../components/rnr';
+import { Button, ScreenHeader } from '../../../components/rnr';
 
 const PARTS = [
   { id: 'DISPLAY', name: 'Display', icon: 'phone-portrait-outline' },
-  { id: 'BACK_DOOR', name: 'Back Door', icon: 'phone-portrait-outline' },
-  { id: 'BACK_DOOR_2', name: 'Back Door', icon: 'phone-portrait-outline' },
+  { id: 'BACK_PANEL', name: 'Back Panel', icon: 'layers-outline' },
   { id: 'SIM_TRAY', name: 'SIM Card Tray', icon: 'card-outline' },
-  { id: 'BUTTONS', name: "Button's", icon: 'apps-outline' },
+  { id: 'BUTTONS', name: 'Buttons', icon: 'radio-button-on-outline' },
+  { id: 'CHARGING_PORT', name: 'Charging Port', icon: 'flash-outline' },
+  { id: 'CAMERA', name: 'Camera', icon: 'camera-outline' },
+  { id: 'SPEAKER', name: 'Speaker', icon: 'volume-high-outline' },
 ];
 
 export default function DeviceMissingPartsScreen({ navigation, route }) {
   const params = route?.params || {};
-  // { [id]: { missing: bool, damage: bool, detail: '' } }
+  // { [id]: { missing, damage, detail } }
   const [state, setState] = useState({});
 
-  const setField = (id, key, value) => setState((p) => ({ ...p, [id]: { ...p[id], [key]: value } }));
+  const setField = (id, key, value) =>
+    setState((p) => ({ ...p, [id]: { ...(p[id] || {}), [key]: value } }));
+
+  const { missingCount, damageCount, flaggedItems } = useMemo(() => {
+    let m = 0, d = 0;
+    const items = [];
+    for (const p of PARTS) {
+      const row = state[p.id] || {};
+      if (row.missing) m += 1;
+      if (row.damage) d += 1;
+      if (row.missing || row.damage) {
+        items.push({
+          partId: p.id,
+          partName: p.name,
+          missing: !!row.missing,
+          damage: !!row.damage,
+          detail: row.detail || null,
+        });
+      }
+    }
+    return { missingCount: m, damageCount: d, flaggedItems: items };
+  }, [state]);
+
+  const onContinue = () => {
+    navigation.navigate('ServiceBookingDevicesList', {
+      ...params,
+      missingParts: flaggedItems,
+    });
+  };
 
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="Device Missing Parts" onBack={() => navigation.goBack()} />
       <ScrollView contentContainerClassName="px-4 pt-4 pb-32">
-        <Text className="font-bold text-text mb-3 pb-2 border-b border-primary">Device Missing / Damage Parts</Text>
+        <Text className="text-text-muted text-xs px-1 mb-2">Flag any part that's missing or damaged on this device.</Text>
 
-        {PARTS.map((p, i) => {
+        <View className="flex-row mb-4">
+          <View className="flex-1 bg-danger/10 border border-danger/30 rounded-xl px-3 py-2 mr-2">
+            <Text className="text-[10px] text-danger font-extrabold tracking-widest">MISSING</Text>
+            <Text className="text-[18px] font-extrabold text-danger mt-0.5">{missingCount}</Text>
+          </View>
+          <View className="flex-1 bg-warning/10 border border-warning/30 rounded-xl px-3 py-2">
+            <Text className="text-[10px] text-warning font-extrabold tracking-widest">DAMAGED</Text>
+            <Text className="text-[18px] font-extrabold text-warning mt-0.5">{damageCount}</Text>
+          </View>
+        </View>
+
+        {PARTS.map((p) => {
           const row = state[p.id] || {};
+          const anyFlag = row.missing || row.damage;
           return (
-            <View key={p.id} className={`pb-3 mb-3 ${i < PARTS.length - 1 ? 'border-b border-border' : ''}`}>
+            <View
+              key={p.id}
+              className={`bg-card border rounded-2xl p-3 mb-2.5 ${anyFlag ? 'border-primary/40' : 'border-border'}`}
+            >
               <View className="flex-row items-center">
-                <View className="w-10 h-10 bg-card border border-border rounded items-center justify-center mr-2">
-                  <Ionicons name={p.icon} size={20} color="#0F172A" />
+                <View className={`w-10 h-10 rounded-xl items-center justify-center mr-2.5 ${anyFlag ? 'bg-primary/15' : 'bg-primary/10'}`}>
+                  <Ionicons name={p.icon} size={18} color="#00008B" />
                 </View>
-                <Text className="flex-1 font-semibold text-text">{p.name}</Text>
-                <View className="flex-row items-center mr-3">
-                  <Checkbox checked={!!row.missing} onChange={(v) => setField(p.id, 'missing', v)} label="Missing" />
-                </View>
-                <Checkbox checked={!!row.damage} onChange={(v) => setField(p.id, 'damage', v)} label="Damage" />
+                <Text className="flex-1 font-extrabold text-text text-[14px]" numberOfLines={1}>{p.name}</Text>
+                <Pressable
+                  onPress={() => setField(p.id, 'missing', !row.missing)}
+                  className={`mr-2 rounded-full px-3 py-1.5 ${row.missing ? 'bg-danger' : 'bg-background border border-border'}`}
+                >
+                  <Text className={`text-[11px] font-bold ${row.missing ? 'text-white' : 'text-text-muted'}`}>Missing</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setField(p.id, 'damage', !row.damage)}
+                  className={`rounded-full px-3 py-1.5 ${row.damage ? 'bg-warning' : 'bg-background border border-border'}`}
+                >
+                  <Text className={`text-[11px] font-bold ${row.damage ? 'text-white' : 'text-text-muted'}`}>Damage</Text>
+                </Pressable>
               </View>
-              <TextInput
-                placeholder="Enter Details"
-                placeholderTextColor="#94A3B8"
-                value={row.detail || ''}
-                onChangeText={(v) => setField(p.id, 'detail', v)}
-                className="mt-2 ml-12 text-text-muted"
-              />
+              {anyFlag ? (
+                <TextInput
+                  placeholder="Add details (optional)"
+                  placeholderTextColor="#94A3B8"
+                  value={row.detail || ''}
+                  onChangeText={(v) => setField(p.id, 'detail', v)}
+                  className="mt-2.5 bg-background border border-border rounded-xl px-3 py-2 text-text text-[13px]"
+                />
+              ) : null}
             </View>
           );
         })}
       </ScrollView>
 
-      <View className="absolute left-0 right-0 bottom-0 p-4 bg-card border-t border-border">
+      <View className="absolute left-0 right-0 bottom-0 p-4 bg-card border-t border-border" style={{ shadowColor: '#0F172A', shadowOpacity: 0.08, shadowRadius: 12, shadowOffset: { width: 0, height: -4 }, elevation: 12 }}>
         <Button
           rightIcon={<Ionicons name="chevron-forward" size={20} color="#fff" />}
-          onPress={() => navigation.navigate('ServiceBookingDevicesList', { ...params, missingParts: state })}
+          onPress={onContinue}
         >
           Continue
         </Button>

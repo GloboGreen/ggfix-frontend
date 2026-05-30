@@ -45,11 +45,20 @@ export default function SelectModelScreen({ navigation, route }) {
     return models.filter((m) => (m.name || '').toLowerCase().includes(needle));
   }, [models, q]);
 
-  const onPick = (m) => navigation.navigate('SelectVariant', {
-    flow, categoryId, categoryCode, categoryName, deviceTypeId, deviceTypeName,
-    brandId, brandName, seriesId, seriesName, modelId: m.id, modelName: m.name,
-    modelImageUrl: m.imageUrl || (m.imageBase64 ? `data:image/png;base64,${m.imageBase64}` : undefined),
-  });
+  const onPick = (m) => {
+    const baseParams = {
+      flow, categoryId, categoryCode, categoryName, deviceTypeId, deviceTypeName,
+      brandId, brandName, seriesId, seriesName, modelId: m.id, modelName: m.name,
+      modelImageUrl: m.imageUrl || (m.imageBase64 ? `data:image/png;base64,${m.imageBase64}` : undefined),
+    };
+    // Owner marketplace listing: insert a category/spare-parts choice between
+    // model selection and the variant (colour/storage) step.
+    if (flow === 'OWNER_LIST') {
+      navigation.navigate('OwnerSellChooseSalesCategory', baseParams);
+      return;
+    }
+    navigation.navigate('SelectVariant', baseParams);
+  };
 
   const crumbs = [{ label: 'Brand', value: brandName }];
   if (seriesName) crumbs.push({ label: 'Series', value: seriesName });

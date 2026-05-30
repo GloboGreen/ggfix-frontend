@@ -333,10 +333,19 @@ export default function MyOrdersScreen({ navigation }) {
                       <Receipt size={11} color="#10B981" />
                       <Text className="ml-1 text-[9px] font-bold text-success">Receipt</Text>
                     </Pressable>
-                    <Pressable onPress={() => openInvoice(o)} className="flex-1 flex-row items-center justify-center py-1 active:opacity-70 border-l border-border">
-                      <ReceiptText size={11} color="#7C3AED" />
-                      <Text className="ml-1 text-[9px] font-bold text-primary">Invoice</Text>
-                    </Pressable>
+                    {(() => {
+                      const completed = String(o.status || '').toUpperCase() === 'COMPLETED';
+                      return (
+                        <Pressable
+                          disabled={!completed}
+                          onPress={() => openInvoice(o)}
+                          className={`flex-1 flex-row items-center justify-center py-1 border-l border-border ${completed ? 'active:opacity-70' : 'opacity-40'}`}
+                        >
+                          <ReceiptText size={11} color="#7C3AED" />
+                          <Text className="ml-1 text-[9px] font-bold text-primary">Invoice</Text>
+                        </Pressable>
+                      );
+                    })()}
                   </View>
                 ) : tab === 'Sell' ? null : (
                   <View className="flex-row mt-2 pt-1.5 border-t border-border -mx-0.5">

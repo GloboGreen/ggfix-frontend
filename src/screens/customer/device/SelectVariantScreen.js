@@ -11,9 +11,9 @@ import {
   Skull,
 } from 'lucide-react-native';
 
-const SELL_CONDITIONS = [
-  { key: 'WORKING', label: 'Working Phone', sub: 'Turns on · Calls · No major issues', icon: Smartphone, color: '#10B981', bg: 'bg-success/10', activeBg: 'bg-success/15', border: 'border-success' },
-  { key: 'DEAD', label: 'Phone Dead / Unknown', sub: "Won't turn on · Not sure", icon: Skull, color: '#EF4444', bg: 'bg-danger/10', activeBg: 'bg-danger/15', border: 'border-danger' },
+const sellConditionsFor = (deviceLabel) => [
+  { key: 'WORKING', label: `Working ${deviceLabel}`, sub: 'Turns on · No major issues', icon: Smartphone, color: '#10B981', bg: 'bg-success/10', activeBg: 'bg-success/15', border: 'border-success' },
+  { key: 'DEAD', label: `${deviceLabel} Dead / Unknown`, sub: "Won't turn on · Not sure", icon: Skull, color: '#EF4444', bg: 'bg-danger/10', activeBg: 'bg-danger/15', border: 'border-danger' },
 ];
 import { notify } from '../../../components/confirm';
 import {
@@ -50,6 +50,28 @@ export default function SelectVariantScreen({ navigation, route }) {
   const brandName = route?.params?.brandName;
   const categoryId = route?.params?.categoryId;
   const modelImageUrl = route?.params?.modelImageUrl;
+
+  // Categories that don't have an IMEI (laptops, audio devices, smartwatches…).
+  // We resolve the category code from either the params (set by the picker) or
+  // the categoryId itself when it's a code string and not a UUID.
+  const isUuid = (v) => typeof v === 'string'
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+  const categoryCode = (
+    typeof categoryId === 'string' && !isUuid(categoryId)
+      ? categoryId
+      : (route?.params?.categoryCode || '')
+  ).toUpperCase();
+  const NO_IMEI_KEYWORDS = ['LAPTOP', 'AUDIO', 'WATCH', 'HEADPHONE', 'EARBUD', 'TABLET'];
+  const noImei = NO_IMEI_KEYWORDS.some((k) => categoryCode.includes(k));
+  // Smart watches & audio devices don't take RAM/Storage selections.
+  const NO_RAM_STORAGE_KEYWORDS = ['WATCH', 'AUDIO', 'HEADPHONE', 'EARBUD'];
+  const noRamStorage = NO_RAM_STORAGE_KEYWORDS.some((k) => categoryCode.includes(k));
+  // Heading + condition labels follow the category.
+  const conditionDeviceLabel = categoryCode.includes('LAPTOP') ? 'Laptop'
+    : categoryCode.includes('WATCH') ? 'Smart Watch'
+    : categoryCode.includes('AUDIO') || categoryCode.includes('HEADPHONE') || categoryCode.includes('EARBUD') ? 'Audio Device'
+    : 'Mobile';
+  const SELL_CONDITIONS = sellConditionsFor(conditionDeviceLabel);
 
   const [rams, setRams] = useState([]);
   const [storages, setStorages] = useState([]);
@@ -100,13 +122,12 @@ export default function SelectVariantScreen({ navigation, route }) {
   }, [rams, storages, ram, storage]);
 
   const onContinue = async () => {
-    if (!ram || !storage || !color) return;
+    if (!color) return;
+    if (!noRamStorage && (!ram || !storage)) return;
 
     // Only send UUID-typed fields the backend can parse. Hardcoded category
     // codes like 'SMARTPHONE' (from Home tiles / fallback list) would fail
     // Spring's @RequestBody UUID parsing — strip anything that isn't a UUID.
-    const isUuid = (v) => typeof v === 'string'
-      && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
     const onlyUuid = (v) => (isUuid(v) ? v : undefined);
 
     // categoryCode is a string code like SMARTPHONE / LAPTOP — preserved
@@ -126,12 +147,12 @@ export default function SelectVariantScreen({ navigation, route }) {
       modelName: modelName && modelName !== 'Device' ? modelName : undefined,
       brandName: brandName || undefined,
       imageUrl: modelImageUrl || undefined,
-      ramLabel: ram?.label || undefined,
-      storageLabel: storage?.label || undefined,
-      ramOptionId: onlyUuid(ram.id),
-      storageOptionId: onlyUuid(storage.id),
+      ramLabel: noRamStorage ? undefined : (ram?.label || undefined),
+      storageLabel: noRamStorage ? undefined : (storage?.label || undefined),
+      ramOptionId: noRamStorage ? undefined : onlyUuid(ram?.id),
+      storageOptionId: noRamStorage ? undefined : onlyUuid(storage?.id),
       color: color?.name || color?.id,
-      imei: flow === 'SELL' ? imei : undefined,
+      imei: (flow === 'SELL' && !noImei) ? imei : undefined,
     };
 
     if (flow === 'PROFILE') {
@@ -154,14 +175,25 @@ export default function SelectVariantScreen({ navigation, route }) {
       navigation.navigate('SellScreening', { device: { ...payload, modelName, imei }, workingCondition: condition });
       return;
     }
+    if (flow === 'OWNER_LIST') {
+      // Owner is listing this device on the marketplace — hand off to the
+      // description chooser (Detailed / Short / Dead Phone Short).
+      navigation.navigate('OwnerSellMobile', { device: { ...payload, modelName, imei } });
+      return;
+    }
   };
 
   if (loading) return <Loader label="Loading variants..." />;
 
-  const ready = ram && storage && color && (flow !== 'SELL' || imei.trim());
+  const ready =
+    color &&
+    (noRamStorage || (ram && storage)) &&
+    (flow !== 'SELL' || noImei || imei.trim());
   const ctaLabel = flow === 'PROFILE'
     ? (isEdit ? 'Update Device' : 'Save Device')
-    : flow === 'REPAIR' ? 'Choose Repair Service' : 'Continue';
+    : flow === 'REPAIR' ? 'Choose Repair Service'
+    : flow === 'OWNER_LIST' ? 'Choose Description'
+    : 'Continue';
 
   return (
     <View className="flex-1 bg-background">
@@ -258,6 +290,7 @@ export default function SelectVariantScreen({ navigation, route }) {
         </View>
 
         {/* RAM */}
+        {!noRamStorage ? (
         <View className="bg-card border border-border rounded-2xl p-3 mb-3">
           <View className="flex-row items-center mb-2.5">
             <View className="h-8 w-8 rounded-full bg-primary/10 items-center justify-center mr-2">
@@ -282,8 +315,10 @@ export default function SelectVariantScreen({ navigation, route }) {
             })}
           </View>
         </View>
+        ) : null}
 
         {/* Storage */}
+        {!noRamStorage ? (
         <View className="bg-card border border-border rounded-2xl p-3 mb-3">
           <View className="flex-row items-center mb-2.5">
             <View className="h-8 w-8 rounded-full bg-secondary/10 items-center justify-center mr-2">
@@ -308,9 +343,10 @@ export default function SelectVariantScreen({ navigation, route }) {
             })}
           </View>
         </View>
+        ) : null}
 
-        {/* IMEI for sell flow */}
-        {flow === 'SELL' ? (
+        {/* IMEI for sell flow — only for mobile/smartphone categories. */}
+        {flow === 'SELL' && !noImei ? (
           <View className="bg-card border border-border rounded-2xl p-3 mb-3">
             <View className="flex-row items-center mb-2.5">
               <View className="h-8 w-8 rounded-full bg-success/10 items-center justify-center mr-2">
@@ -333,7 +369,7 @@ export default function SelectVariantScreen({ navigation, route }) {
         {/* Phone condition (sell flow) */}
         {flow === 'SELL' ? (
           <View className="bg-card border border-border rounded-2xl p-3 mb-3">
-            <Text className="text-[11px] font-extrabold text-text-muted tracking-widest mb-2">PHONE CONDITION</Text>
+            <Text className="text-[11px] font-extrabold text-text-muted tracking-widest mb-2">{conditionDeviceLabel.toUpperCase()} CONDITION</Text>
             <View className="flex-row -mx-1">
               {SELL_CONDITIONS.map((o) => {
                 const Icon = o.icon;

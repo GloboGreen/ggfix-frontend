@@ -61,7 +61,22 @@ export default function SellImagesScreen({ navigation, route }) {
   const remove = (key) => setImages((m) => { const n = { ...m }; delete n[key]; return n; });
 
   const onContinue = () => {
-    navigation.navigate('SellAddress', { ...params, deviceCondition: condition, images });
+    // Detect the stack by inspecting the navigator's registered routes. This is
+    // more reliable than depending on a `flow` param surviving every intermediate
+    // screen — if any screen in the chain forgets to spread params, the flag
+    // disappears, but `routeNames` always reflects the actual stack we're in.
+    let hasOwnerRoute = false;
+    try { hasOwnerRoute = navigation.getState()?.routeNames?.includes('OwnerSellGadgetPrice') === true; } catch (_) {}
+    const ownerListing = hasOwnerRoute
+      || params.flow === 'OWNER_LIST'
+      || !!params.descriptionType;
+    const next = ownerListing ? 'OwnerSellGadgetPrice' : 'SellAddress';
+    navigation.navigate(next, {
+      ...params,
+      flow: ownerListing ? 'OWNER_LIST' : params.flow,
+      deviceCondition: condition,
+      images,
+    });
   };
 
   return (

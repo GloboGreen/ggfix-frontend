@@ -3,7 +3,7 @@ import { Image, Pressable, ScrollView, Text, View } from 'react-native';
 import {
   Smartphone, Laptop, Watch, Tablet, Headphones, Volume2, ChevronRight,
 } from 'lucide-react-native';
-import { EmptyState, Loader, SearchBar } from '../../../components/rnr';
+import { EmptyState, Loader, ScreenHeader, SearchBar } from '../../../components/rnr';
 import { getDeviceCategories } from '../../../api/masterData';
 
 const CODE_META = {
@@ -51,8 +51,14 @@ export default function SelectCategoryScreen({ navigation, route }) {
 
   if (loading) return <Loader label="Loading categories..." />;
 
+  const headerTitle = flow === 'OWNER_LIST' ? 'Sell' : 'Select Category';
+
   return (
     <View className="flex-1 bg-background">
+      <ScreenHeader
+        title={headerTitle}
+        onBack={navigation.canGoBack() ? () => navigation.goBack() : undefined}
+      />
       <View className="bg-card border-b border-border px-4 pt-3 pb-3">
         <SearchBar value={q} onChangeText={setQ} placeholder="Search category" onClear={() => setQ('')} />
       </View>

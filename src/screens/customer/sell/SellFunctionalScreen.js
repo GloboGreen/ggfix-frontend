@@ -54,7 +54,7 @@ export default function SellFunctionalScreen({ navigation, route }) {
         </Card>
       </ScrollView>
       <View style={styles.bottom}>
-        <PrimaryButton title="Continue →" onPress={() => navigation.navigate('SellAccessoriesWarranty', { ...params, issues: selected.map((id) => ({ issueId: id })) })} />
+        <PrimaryButton title="Continue →" onPress={() => navigation.navigate('SellDeviceConfig', { ...params, issues: selected.map((id) => ({ issueId: id })) })} />
       </View>
     </View>
   );

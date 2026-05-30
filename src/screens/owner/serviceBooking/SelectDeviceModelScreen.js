@@ -43,9 +43,12 @@ export default function SelectDeviceModelScreen({ navigation, route }) {
     return models.filter((m) => (m.name || '').toLowerCase().includes(needle));
   }, [models, q]);
 
-  const onPick = (m) => navigation.navigate('DeviceColorStorage', {
-    ...params, modelId: m.id, modelName: m.name,
-  });
+  const onPick = (m) => {
+    const imageUrl = m.imageUrl || (m.imageBase64 ? `data:image/png;base64,${m.imageBase64}` : null);
+    navigation.navigate('DeviceColorStorage', {
+      ...params, modelId: m.id, modelName: m.name, imageUrl,
+    });
+  };
 
   const crumbs = [{ label: 'Brand', value: brandName }];
   if (seriesName) crumbs.push({ label: 'Series', value: seriesName });
