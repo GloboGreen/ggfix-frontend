@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, ScrollView, Text, View } from 'react-native';
-import { ChevronRight, Layers } from 'lucide-react-native';
+import { Check, ChevronRight, Layers } from 'lucide-react-native';
 import {
   Loader, ScreenHeader, SearchBar, EmptyState, SelectionCrumb,
 } from '../../../components/rnr';
@@ -8,7 +8,7 @@ import { getSeriesForCategoryBrand } from '../../../api/masterData';
 
 export default function SelectDeviceSeriesScreen({ navigation, route }) {
   const params = route?.params || {};
-  const { categoryId, brandId, brandName } = params;
+  const { categoryId, brandId, brandName, editMode, seriesId: currentSeriesId } = params;
   const [series, setSeries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
@@ -32,10 +32,20 @@ export default function SelectDeviceSeriesScreen({ navigation, route }) {
   }, [categoryId, brandId]);
 
   const filtered = useMemo(() => {
-    if (!q.trim()) return series;
-    const needle = q.toLowerCase();
-    return series.filter((s) => (s.name || '').toLowerCase().includes(needle));
-  }, [series, q]);
+    const base = !q.trim()
+      ? series
+      : series.filter((s) => (s.name || '').toLowerCase().includes(q.toLowerCase()));
+    if (editMode && currentSeriesId) {
+      const idx = base.findIndex((s) => s.id === currentSeriesId);
+      if (idx > 0) {
+        const copy = base.slice();
+        const [cur] = copy.splice(idx, 1);
+        copy.unshift(cur);
+        return copy;
+      }
+    }
+    return base;
+  }, [series, q, editMode, currentSeriesId]);
 
   const onPick = (s) => navigation.navigate('SelectDeviceModel', {
     ...params, seriesId: s.id, seriesName: s.name,
@@ -58,11 +68,12 @@ export default function SelectDeviceSeriesScreen({ navigation, route }) {
           ) : (
             filtered.map((s) => {
               const thumb = s.imageUrl || s.imageBase64;
+              const isCurrent = editMode && currentSeriesId === s.id;
               return (
                 <Pressable
                   key={s.id}
                   onPress={() => onPick(s)}
-                  className="flex-row items-center bg-card border border-border rounded-2xl p-3.5 mb-3 active:opacity-80"
+                  className={`flex-row items-center bg-card border rounded-2xl p-3.5 mb-3 active:opacity-80 ${isCurrent ? 'border-primary' : 'border-border'}`}
                   style={{ shadowColor: '#0F172A', shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 1 }}
                 >
                   <View className="h-12 w-12 rounded-xl bg-primary/10 items-center justify-center mr-3 overflow-hidden">
@@ -73,6 +84,12 @@ export default function SelectDeviceSeriesScreen({ navigation, route }) {
                     )}
                   </View>
                   <Text className="flex-1 text-[14px] font-extrabold text-text" numberOfLines={1}>{s.name}</Text>
+                  {isCurrent ? (
+                    <View className="flex-row items-center bg-primary/10 border border-primary/30 rounded-full px-2 py-0.5 mr-1">
+                      <Check size={10} color="#00008B" />
+                      <Text className="text-[10px] font-extrabold text-primary ml-1">Current</Text>
+                    </View>
+                  ) : null}
                   <ChevronRight size={18} color="#94A3B8" />
                 </Pressable>
               );

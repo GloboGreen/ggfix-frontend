@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Smartphone, Mail, Lock, User, Phone, Store, ShieldCheck } from 'lucide-react-native';
+import { Smartphone, Mail, Lock, User, Phone, Store, ShieldCheck, KeyRound } from 'lucide-react-native';
 import { login, customerLogin, customerRegister } from '../api/auth';
 import { AUTH_BASE } from '../api/config';
 import { Button, Input, Label } from '../components/rnr';
@@ -9,9 +9,11 @@ import { Button, Input, Label } from '../components/rnr';
 export default function LoginScreen({ onLogin }) {
   const [mode, setMode] = useState('CUSTOMER'); // CUSTOMER | OWNER
   const [isRegister, setIsRegister] = useState(false);
+  const [authMethod, setAuthMethod] = useState('PASSWORD'); // PASSWORD | OTP
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [otp, setOtp] = useState('');
   const [shopSlug, setShopSlug] = useState('');
   const [mobile, setMobile] = useState('');
   const [fullName, setFullName] = useState('');
@@ -20,6 +22,7 @@ export default function LoginScreen({ onLogin }) {
   const [error, setError] = useState(null);
 
   const isCustomer = mode === 'CUSTOMER';
+  const usingOtp = authMethod === 'OTP' && !isRegister;
 
   const handleSubmit = async () => {
     setError(null);
@@ -27,11 +30,14 @@ export default function LoginScreen({ onLogin }) {
       setLoading(true);
       let data;
       if (mode === 'OWNER') {
-        if (!email.trim() || !password.trim()) {
-          setError('Email and password required');
-          return;
+        if (!email.trim()) { setError('Email is required'); return; }
+        if (usingOtp) {
+          if (!otp.trim()) { setError('OTP is required'); return; }
+          data = await login(email.trim(), { otp: otp.trim(), shopSlug: shopSlug.trim() || undefined });
+        } else {
+          if (!password.trim()) { setError('Password is required'); return; }
+          data = await login(email.trim(), { password, shopSlug: shopSlug.trim() || undefined });
         }
-        data = await login(email.trim(), password, shopSlug.trim() || undefined);
       } else if (isRegister) {
         if (!mobile.trim() || !password.trim() || !fullName.trim()) {
           setError('Name, mobile and password required');
@@ -44,25 +50,23 @@ export default function LoginScreen({ onLogin }) {
           password,
         });
       } else {
-        if (!mobile.trim() || !password.trim()) {
-          setError('Mobile and password required');
-          return;
-        }
+        if (!mobile.trim()) { setError('Mobile is required'); return; }
         const trimmed = mobile.trim();
+        const credential = usingOtp ? { otp: otp.trim() } : { password };
+        if (usingOtp && !otp.trim()) { setError('OTP is required'); return; }
+        if (!usingOtp && !password.trim()) { setError('Password is required'); return; }
         const looksLikeEmail = trimmed.includes('@') || /[a-zA-Z]/.test(trimmed);
         if (looksLikeEmail) {
-          // Fallback: try the shop-side login (email + password) and route by role.
           try {
-            data = await login(trimmed, password);
+            data = await login(trimmed, credential);
           } catch (innerErr) {
-            // Surface a hint instead of a generic 401
             setError(
               `That looks like an email. If you're a shop owner or technician, switch to the "Shop / Tech" tab.`,
             );
             return;
           }
         } else {
-          data = await customerLogin({ mobile: trimmed, password });
+          data = await customerLogin({ mobile: trimmed, ...credential });
         }
       }
       onLogin(data);
@@ -183,48 +187,79 @@ export default function LoginScreen({ onLogin }) {
                 </View>
               ) : null}
 
+              {!isRegister ? <AuthMethodToggle value={authMethod} onChange={setAuthMethod} /> : null}
+
               <View className="mb-1">
-                <Label>Password</Label>
+                <Label>{usingOtp ? 'OTP' : 'Password'}</Label>
                 <View className="flex-row items-center bg-background rounded-xl border border-border px-3">
-                  <Lock size={16} color="#64748B" />
-                  <Input
-                    placeholder="••••••••"
-                    value={password}
-                    onChangeText={setPassword}
-                    secureTextEntry
-                    className="flex-1 bg-transparent border-0 ml-2"
-                  />
+                  {usingOtp ? <KeyRound size={16} color="#64748B" /> : <Lock size={16} color="#64748B" />}
+                  {usingOtp ? (
+                    <Input
+                      placeholder="6-digit OTP"
+                      value={otp}
+                      onChangeText={(v) => setOtp(v.replace(/[^0-9]/g, '').slice(0, 6))}
+                      keyboardType="number-pad"
+                      maxLength={6}
+                      className="flex-1 bg-transparent border-0 ml-2"
+                    />
+                  ) : (
+                    <Input
+                      placeholder="••••••••"
+                      value={password}
+                      onChangeText={setPassword}
+                      secureTextEntry
+                      className="flex-1 bg-transparent border-0 ml-2"
+                    />
+                  )}
                 </View>
+                {usingOtp ? (
+                  <Text className="text-[10.5px] text-text-muted mt-1.5 ml-1">Dev OTP: 123456 (real SMS OTP coming later)</Text>
+                ) : null}
               </View>
             </>
           ) : (
             <>
               <View className="mb-3">
-                <Label>Email</Label>
+                <Label>Email or Mobile</Label>
                 <View className="flex-row items-center bg-background rounded-xl border border-border px-3">
                   <Mail size={16} color="#64748B" />
                   <Input
-                    placeholder="you@example.com"
+                    placeholder="you@example.com or 9876543210"
                     value={email}
                     onChangeText={setEmail}
                     autoCapitalize="none"
-                    keyboardType="email-address"
                     className="flex-1 bg-transparent border-0 ml-2"
                   />
                 </View>
               </View>
+              <AuthMethodToggle value={authMethod} onChange={setAuthMethod} />
+
               <View className="mb-3">
-                <Label>Password</Label>
+                <Label>{usingOtp ? 'OTP' : 'Password'}</Label>
                 <View className="flex-row items-center bg-background rounded-xl border border-border px-3">
-                  <Lock size={16} color="#64748B" />
-                  <Input
-                    placeholder="••••••••"
-                    value={password}
-                    onChangeText={setPassword}
-                    secureTextEntry
-                    className="flex-1 bg-transparent border-0 ml-2"
-                  />
+                  {usingOtp ? <KeyRound size={16} color="#64748B" /> : <Lock size={16} color="#64748B" />}
+                  {usingOtp ? (
+                    <Input
+                      placeholder="6-digit OTP"
+                      value={otp}
+                      onChangeText={(v) => setOtp(v.replace(/[^0-9]/g, '').slice(0, 6))}
+                      keyboardType="number-pad"
+                      maxLength={6}
+                      className="flex-1 bg-transparent border-0 ml-2"
+                    />
+                  ) : (
+                    <Input
+                      placeholder="••••••••"
+                      value={password}
+                      onChangeText={setPassword}
+                      secureTextEntry
+                      className="flex-1 bg-transparent border-0 ml-2"
+                    />
+                  )}
                 </View>
+                {usingOtp ? (
+                  <Text className="text-[10.5px] text-text-muted mt-1.5 ml-1">Super-admin OTPs are unique per account. Default dev OTP for shop staff: 123456.</Text>
+                ) : null}
               </View>
               <View className="mb-1">
                 <Label>Shop slug (optional)</Label>
@@ -279,5 +314,29 @@ export default function LoginScreen({ onLogin }) {
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
+  );
+}
+
+function AuthMethodToggle({ value, onChange }) {
+  const isPwd = value === 'PASSWORD';
+  return (
+    <View className="flex-row bg-background rounded-xl p-1 mb-3 border border-border">
+      <Pressable
+        onPress={() => onChange('PASSWORD')}
+        className={`flex-1 flex-row items-center justify-center py-2 rounded-lg ${isPwd ? 'bg-card' : ''}`}
+        style={isPwd ? { shadowColor: '#0F172A', shadowOpacity: 0.06, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } } : null}
+      >
+        <Lock size={13} color={isPwd ? '#00008B' : '#64748B'} />
+        <Text className={`ml-1.5 text-[12px] font-bold ${isPwd ? 'text-primary' : 'text-text-muted'}`}>Password</Text>
+      </Pressable>
+      <Pressable
+        onPress={() => onChange('OTP')}
+        className={`flex-1 flex-row items-center justify-center py-2 rounded-lg ${!isPwd ? 'bg-card' : ''}`}
+        style={!isPwd ? { shadowColor: '#0F172A', shadowOpacity: 0.06, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } } : null}
+      >
+        <KeyRound size={13} color={!isPwd ? '#00008B' : '#64748B'} />
+        <Text className={`ml-1.5 text-[12px] font-bold ${!isPwd ? 'text-primary' : 'text-text-muted'}`}>OTP</Text>
+      </Pressable>
+    </View>
   );
 }

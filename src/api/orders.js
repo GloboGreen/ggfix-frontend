@@ -44,6 +44,9 @@ export async function postShopBookingStatus(id, payload) {
 export async function cancelRepairBooking(id) {
   return await orderApi.post(`/repair-bookings/${id}/cancel`);
 }
+export async function approveRepairBooking(id) {
+  return await orderApi.post(`/repair-bookings/${id}/customer-approval`);
+}
 
 // Sell orders
 export async function createSellOrder(payload) {
@@ -60,6 +63,9 @@ export async function getSellOrderQuotations(id) {
 }
 export async function chooseSellQuotation(id, quotationId) {
   return await orderApi.post(`/sell-orders/${id}/choose-quotation`, { body: { quotationId } });
+}
+export async function updateSellOrder(id, payload) {
+  return await orderApi.put(`/sell-orders/${id}`, { body: payload });
 }
 export async function cancelSellOrder(id) {
   return await orderApi.post(`/sell-orders/${id}/cancel`);

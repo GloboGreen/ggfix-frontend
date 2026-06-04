@@ -14,13 +14,16 @@ export default function NewBookingScreen({ navigation }) {
 
   // Backend can return the same person more than once (multiple legacy rows for
   // the same phone). Collapse them by name+phone so the search list shows one
-  // row per real customer.
+  // row per real customer. Prefer the shop-scoped row over the platform row
+  // when both exist for the same phone — booking needs a shop customers.id.
   const dedupedResults = useMemo(() => {
     const byKey = new Map();
     for (const c of results) {
       const phone = String(c.phone || c.mobile || '').replace(/\s|\+|-/g, '');
       const key = `${String(c.name || '').toLowerCase().trim()}|${phone}`;
-      if (!byKey.has(key)) byKey.set(key, c);
+      const existing = byKey.get(key);
+      if (!existing) { byKey.set(key, c); continue; }
+      if (existing.source === 'platform' && c.source === 'shop') byKey.set(key, c);
     }
     return Array.from(byKey.values());
   }, [results]);
@@ -69,19 +72,38 @@ export default function NewBookingScreen({ navigation }) {
         </View>
 
         <View className="mt-4">
-          {dedupedResults.map((c) => (
-            <Card key={c.id} className="mb-3 flex-row items-center">
-              <Avatar fallback={(c.name || '?').slice(0, 2)} size={48} />
-              <View className="flex-1 ml-3">
-                <Text className="font-bold text-text">{c.name}</Text>
-                <Text className="text-xs text-text-muted">{c.phone || ''}</Text>
-                {c.address ? <Text className="text-xs text-text-muted">{c.address}</Text> : null}
-              </View>
-              <Button size="sm" onPress={() => navigation.navigate('ChooseDevice', { customerId: c.id, customer: c })}>
-                Booking
-              </Button>
-            </Card>
-          ))}
+          {dedupedResults.map((c) => {
+            const isPlatform = c.source === 'platform';
+            const rowKey = `${c.source || 'shop'}:${c.id}`;
+            const onPick = () => {
+              navigation.navigate('CustomerDetails', {
+                initial: {
+                  name: c.name || '',
+                  phone: c.phone || c.mobile || '',
+                  email: c.email || '',
+                },
+                existing: c,
+              });
+            };
+            return (
+              <Card key={rowKey} className="mb-3 flex-row items-center">
+                <Avatar fallback={(c.name || '?').slice(0, 2)} size={48} />
+                <View className="flex-1 ml-3">
+                  <View className="flex-row items-center">
+                    <Text className="font-bold text-text">{c.name}</Text>
+                    {isPlatform ? (
+                      <View className="ml-2 px-2 py-0.5 rounded-full bg-primary/10">
+                        <Text className="text-[10px] text-primary font-semibold">App user</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  <Text className="text-xs text-text-muted">{c.phone || ''}</Text>
+                  {c.address ? <Text className="text-xs text-text-muted">{c.address}</Text> : null}
+                </View>
+                <Button size="sm" onPress={onPick}>Booking</Button>
+              </Card>
+            );
+          })}
           {!loading && q.trim() && dedupedResults.length === 0 ? (
             <Text className="text-center text-text-muted py-6">No matching customers</Text>
           ) : null}

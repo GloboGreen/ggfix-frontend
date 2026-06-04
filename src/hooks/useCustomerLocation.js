@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
+import * as Location from 'expo-location';
 import { listAddresses } from '../api/customer';
 
 /**
@@ -27,16 +28,43 @@ const DEFAULT_LOCATION = {
 
 const GPS_MAX_ACCURACY_METERS = 5000;
 
+// On native (iOS/Android), navigator.geolocation isn't reliably polyfilled in
+// Expo SDK 54 — we use expo-location which handles the runtime permission
+// prompt + native fix. On web, expo-location internally calls the browser
+// Geolocation API so the same code path works.
 function geolocationAvailable() {
-  return typeof navigator !== 'undefined' && navigator.geolocation
-    && (Platform.OS === 'web' || typeof navigator.geolocation.getCurrentPosition === 'function');
+  // expo-location loads on all platforms; for web we still want navigator as a
+  // sanity check since some embedded webviews disable Geolocation entirely.
+  if (Platform.OS === 'web') {
+    return typeof navigator !== 'undefined' && !!navigator.geolocation;
+  }
+  return true;
 }
 
-function getPosition(options) {
-  return new Promise((resolve, reject) => {
-    if (!geolocationAvailable()) { reject(new Error('Geolocation not available')); return; }
-    navigator.geolocation.getCurrentPosition(resolve, reject, options);
+async function ensurePermission() {
+  let res = await Location.getForegroundPermissionsAsync();
+  if (res.status === 'granted') return true;
+  res = await Location.requestForegroundPermissionsAsync();
+  return res.status === 'granted';
+}
+
+async function getPosition(options = {}) {
+  if (!geolocationAvailable()) throw new Error('Geolocation not available');
+  const ok = await ensurePermission();
+  if (!ok) throw new Error('Location permission denied');
+  // Mirror the navigator.geolocation shape so the rest of the hook is unchanged.
+  const pos = await Location.getCurrentPositionAsync({
+    accuracy: options.enableHighAccuracy ? Location.Accuracy.Highest : Location.Accuracy.Balanced,
+    timeInterval: 0,
+    distanceInterval: 0,
   });
+  return {
+    coords: {
+      latitude: pos.coords.latitude,
+      longitude: pos.coords.longitude,
+      accuracy: pos.coords.accuracy,
+    },
+  };
 }
 
 // Best-effort reverse geocode (keyless, CORS-enabled client endpoint). Falls
@@ -71,14 +99,17 @@ export function useCustomerLocation({ enableGps = true } = {}) {
     addressLabel: null,
   });
 
+  // No demo-coord fallback: customers must grant GPS or set an address with
+  // saved coords. Without one, lat/lng stay null and the screen shows a
+  // permission-prompt empty state instead of pretending we're in Cuddalore.
   const setDefault = useCallback((extraError) => {
     setState({
-      lat: DEFAULT_LOCATION.lat,
-      lng: DEFAULT_LOCATION.lng,
-      source: 'default',
+      lat: null,
+      lng: null,
+      source: null,
       loading: false,
-      error: extraError || null,
-      addressLabel: DEFAULT_LOCATION.label,
+      error: extraError || 'Location permission required — tap below to allow.',
+      addressLabel: null,
     });
   }, []);
 
@@ -149,21 +180,21 @@ export function useCustomerLocation({ enableGps = true } = {}) {
         return;
       }
 
-      // 3. Browser GPS — accuracy-gated so IP-fallback doesn't poison things.
+      // 3. Native / browser GPS via expo-location (asks runtime permission on
+      //    first call). Accuracy-gated so IP fallbacks don't poison things.
       if (enableGps && geolocationAvailable()) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            const { latitude, longitude, accuracy } = pos.coords;
-            if (accuracy && accuracy > GPS_MAX_ACCURACY_METERS) {
-              setDefault(`Browser location too imprecise (~${Math.round(accuracy / 1000)} km). Tap to use current location.`);
-              return;
-            }
-            applyGps(latitude, longitude);
-          },
-          () => { setDefault(); },
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 60_000 },
-        );
-        return;
+        try {
+          const pos = await getPosition({ enableHighAccuracy: true });
+          const { latitude, longitude, accuracy } = pos.coords;
+          if (accuracy && accuracy > GPS_MAX_ACCURACY_METERS) {
+            setDefault(`Location too imprecise (~${Math.round(accuracy / 1000)} km). Tap to use current location.`);
+            return;
+          }
+          await applyGps(latitude, longitude);
+          return;
+        } catch (e) {
+          // Permission denied / no signal — fall through to the no-location state.
+        }
       }
 
       // 4. No GPS available → demo default

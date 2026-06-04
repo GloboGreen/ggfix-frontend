@@ -20,11 +20,26 @@ export default function ServicePriceEstimateScreen({ navigation, route }) {
   const total = services.reduce((sum, s) => sum + (Number(s.price) || 0), 0);
 
   // Lock "now" at mount so the displayed date/time and delivery calc are stable.
-  const [now] = useState(() => new Date());
-  const [imei, setImei] = useState('');
-  const [complaint, setComplaint] = useState('');
-  const [duration, setDuration] = useState(2);
-  const [approval, setApproval] = useState(true);
+  // In edit mode, anchor "now" to the booking's original estimatedReadyAt so the
+  // duration math (delivery = now + duration) stays meaningful for prefill.
+  const [now] = useState(() => {
+    if (params.prefillEstimatedReadyIso) {
+      const d = new Date(params.prefillEstimatedReadyIso);
+      if (!isNaN(d.getTime())) return d;
+    }
+    return new Date();
+  });
+  const [imei, setImei] = useState(params.prefillImei || '');
+  const [complaint, setComplaint] = useState(params.prefillComplaint || '');
+  const [duration, setDuration] = useState(() => {
+    if (params.prefillEstimatedReadyIso && params.prefillEstimatedDeliveryIso) {
+      const ms = new Date(params.prefillEstimatedDeliveryIso) - new Date(params.prefillEstimatedReadyIso);
+      const hrs = Math.max(1, Math.round(ms / (60 * 60 * 1000)));
+      if (DURATIONS.some((d) => d.value === hrs)) return hrs;
+    }
+    return 2;
+  });
+  const [approval, setApproval] = useState(params.prefillCustomerApproved ?? false);
 
   const dateLabel = formatDate(now);
   const timeLabel = formatTime(now);

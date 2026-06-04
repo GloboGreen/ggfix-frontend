@@ -5,6 +5,24 @@ import { Button, Card, ScreenHeader } from '../../../components/rnr';
 import { ticketApi } from '../../../api/client';
 import { notify } from '../../../components/confirm';
 
+function serviceSummaryFor(device) {
+  return (device.services || [])
+    .map((service) => service.serviceName)
+    .filter(Boolean)
+    .join(', ');
+}
+
+function priceItemsJsonFor(device) {
+  const items = (device.services || []).map((service) => ({
+    id: service.serviceId || null,
+    code: service.serviceCode || null,
+    label: service.serviceName || 'Service',
+    amount: Number(service.price) || 0,
+    warranty: service.warranty || null,
+  }));
+  return items.length ? JSON.stringify(items) : null;
+}
+
 export default function ServiceBookingDevicesListScreen({ navigation, route }) {
   const params = route?.params || {};
   // Build a device record from the just-finished flow (if any modelId came through).
@@ -61,36 +79,52 @@ export default function ServiceBookingDevicesListScreen({ navigation, route }) {
     });
   };
 
+  const buildTicketBody = (d) => ({
+    customerId: params.customerId,
+    customerName: params.customer?.name || params.customer?.fullName || null,
+    customerPhone: params.customer?.phone || params.customer?.mobile || null,
+    brandId: d.brandId,
+    modelId: d.modelId,
+    ramOptionId: d.ramOptionId,
+    storageOptionId: d.storageOptionId,
+    color: d.color,
+    imei: d.imei,
+    issueDescription: d.complaint,
+    estimatedPrice: totalFor(d),
+    deviceDisplayName: d.modelName ? `${d.modelName}${d.ramLabel || d.storageLabel ? ` (${[d.ramLabel, d.storageLabel].filter(Boolean).join(' / ')})` : ''}` : null,
+    deviceImageUrl: d.imageUrl || null,
+    repairServicesSummary: serviceSummaryFor(d) || null,
+    priceItemsJson: priceItemsJsonFor(d),
+    deviceSecurityType: d.lock?.type || 'NONE',
+    deviceSecurityValue: d.lock?.value || null,
+    missingPartsJson: (d.missingParts && d.missingParts.length) ? JSON.stringify(d.missingParts) : null,
+    devicePhotosJson: d.devicePhotos ? JSON.stringify(d.devicePhotos) : null,
+    estimatedReadyAt: d.estimatedReadyIso || null,
+    estimatedDeliveryAt: d.estimatedDeliveryIso || null,
+    customerApproval: d.customerApproved ?? null,
+  });
+
   const submit = async () => {
     if (!params.customerId) { notify('Missing', 'Customer is required'); return; }
     setSubmitting(true);
     try {
+      // Edit mode: update the existing ticket in place via PUT and route to the
+      // same Thank You / Receipt / Barcode flow as a fresh booking.
+      if (params.editMode && params.editTicketId) {
+        const d = devices[0] || {};
+        const res = await ticketApi.put(`/tickets/${params.editTicketId}`, { body: buildTicketBody(d) });
+        navigation.replace('BookingThankYou', {
+          customer: params.customer,
+          devices,
+          tickets: [res],
+          editMode: true,
+        });
+        return;
+      }
+
       const created = [];
       for (const d of devices) {
-        const res = await ticketApi.post('/tickets', {
-          body: {
-            customerId: params.customerId,
-            customerName: params.customer?.name || params.customer?.fullName || null,
-            customerPhone: params.customer?.phone || params.customer?.mobile || null,
-            brandId: d.brandId,
-            modelId: d.modelId,
-            ramOptionId: d.ramOptionId,
-            storageOptionId: d.storageOptionId,
-            color: d.color,
-            imei: d.imei,
-            issueDescription: d.complaint,
-            estimatedPrice: totalFor(d),
-            deviceDisplayName: d.modelName ? `${d.modelName}${d.ramLabel || d.storageLabel ? ` (${[d.ramLabel, d.storageLabel].filter(Boolean).join(' / ')})` : ''}` : null,
-            deviceImageUrl: d.imageUrl || null,
-            deviceSecurityType: d.lock?.type || 'NONE',
-            deviceSecurityValue: d.lock?.value || null,
-            missingPartsJson: (d.missingParts && d.missingParts.length) ? JSON.stringify(d.missingParts) : null,
-            devicePhotosJson: d.devicePhotos ? JSON.stringify(d.devicePhotos) : null,
-            estimatedReadyAt: d.estimatedReadyIso || null,
-            estimatedDeliveryAt: d.estimatedDeliveryIso || null,
-            customerApproval: d.customerApproved ?? null,
-          },
-        });
+        const res = await ticketApi.post('/tickets', { body: buildTicketBody(d) });
         created.push(res);
       }
       navigation.replace('BookingThankYou', {
@@ -142,17 +176,22 @@ export default function ServiceBookingDevicesListScreen({ navigation, route }) {
           </Card>
         ))}
 
-        <Text className="text-error text-[11px] text-center mt-1.5 px-2">
-          This customer has multiple devices. Click "Add More Device" to book another repair. *
-        </Text>
-
-        <View className="items-center mt-2">
-          <Button onPress={addMore}>Add More Device</Button>
-        </View>
+        {params.editMode ? null : (
+          <>
+            <Text className="text-error text-[11px] text-center mt-1.5 px-2">
+              This customer has multiple devices. Click "Add More Device" to book another repair. *
+            </Text>
+            <View className="items-center mt-2">
+              <Button onPress={addMore}>Add More Device</Button>
+            </View>
+          </>
+        )}
       </ScrollView>
 
       <View className="absolute left-0 right-0 bottom-0 p-4 bg-card border-t border-border">
-        <Button className="bg-success" loading={submitting} onPress={submit}>Submit</Button>
+        <Button className="bg-success" loading={submitting} onPress={submit}>
+          {params.editMode ? 'Update Booking' : 'Submit'}
+        </Button>
       </View>
     </View>
   );

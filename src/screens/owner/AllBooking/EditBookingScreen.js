@@ -147,11 +147,11 @@ export default function EditBookingScreen({ route, navigation }) {
                 <Text className="text-[10px] font-bold text-text">{idx + 1}</Text>
               </View>
               <Text className="text-[12px] text-text flex-1" numberOfLines={1}>{item.label}</Text>
-              <Text className="text-[12px] font-bold text-text">â‚¹{Number(item.amount || 0).toLocaleString('en-IN')}</Text>
+              <Text className="text-[12px] font-bold text-text">₹{Number(item.amount || 0).toLocaleString('en-IN')}</Text>
             </View>
           ))}
           <PriceDivider />
-          <PriceRow label="Estimated Repair Amount" value={`â‚¹${Number(estimatedTotal).toLocaleString('en-IN')}`} bold />
+          <PriceRow label="Estimated Repair Amount" value={`₹${Number(estimatedTotal).toLocaleString('en-IN')}`} bold />
         </Card>
 
         {/* IMEI + Notes */}

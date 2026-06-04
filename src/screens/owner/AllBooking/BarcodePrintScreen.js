@@ -9,7 +9,7 @@ import { ticketApi } from '../../../api/client';
 /**
  * Pure-RN faux barcode: deterministic bar-width pattern based on the input
  * string so the same tracking ID always renders the same pattern. Good
- * enough for visual print/share â€” not a scannable Code 128, but reads as
+ * enough for visual print/share — not a scannable Code 128, but reads as
  * a barcode for the receipt header.
  */
 function CodePattern({ value, width = 280, height = 70 }) {
@@ -56,12 +56,12 @@ export default function BarcodePrintScreen({ navigation, route }) {
   const deviceName = ticket?.deviceModelName || ticket?.modelName || 'Device';
   const services = ticket?.repairServicesSummary
     || ticket?.services?.map?.((s) => s.serviceName).join(', ')
-    || 'â€”';
-  const customerName = ticket?.customerName || 'â€”';
+    || '—';
+  const customerName = ticket?.customerName || '—';
 
   const handleShare = async () => {
     const msg =
-      `ðŸ“¦ GGFix Barcode Slip\n\n` +
+      `📦 GGFix Barcode Slip\n\n` +
       `Tracking: ${trackingId}\n` +
       `Customer: ${customerName}\n` +
       `Device: ${deviceName}\n` +
@@ -78,7 +78,7 @@ export default function BarcodePrintScreen({ navigation, route }) {
   const handlePrint = () => {
     notify(
       'Printing not configured',
-      `${copies} slip${copies > 1 ? 's' : ''} for ${trackingId}.\n\nNative print needs Expo Print â€” use the Share button for now and pick "Print" from the share sheet.`,
+      `${copies} slip${copies > 1 ? 's' : ''} for ${trackingId}.\n\nNative print needs Expo Print — use the Share button for now and pick "Print" from the share sheet.`,
     );
   };
 

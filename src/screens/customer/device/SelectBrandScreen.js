@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, ScrollView, Text, View } from 'react-native';
-import { ChevronRight } from 'lucide-react-native';
+import { ChevronRight, CheckCircle2, Pencil } from 'lucide-react-native';
 import { EmptyState, Loader, SearchBar, SelectionCrumb } from '../../../components/rnr';
 import { getBrandsForCategory } from '../../../api/masterData';
 
@@ -20,10 +20,15 @@ function paletteFor(name) {
 
 export default function SelectBrandScreen({ navigation, route }) {
   const flow = route?.params?.flow || 'PROFILE';
-  const { categoryId, categoryCode, categoryName, deviceTypeId, deviceTypeName } = route?.params || {};
+  const {
+    categoryId, categoryCode, categoryName, deviceTypeId, deviceTypeName,
+    editSellOrderId, editHints,
+  } = route?.params || {};
   const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
+  const isEditing = !!editSellOrderId;
+  const currentBrandId = editHints?.brandId || null;
 
   useEffect(() => {
     (async () => {
@@ -33,13 +38,22 @@ export default function SelectBrandScreen({ navigation, route }) {
   }, [categoryId]);
 
   const filtered = useMemo(() => {
-    if (!q.trim()) return brands;
-    return brands.filter((b) => (b.name || '').toLowerCase().includes(q.toLowerCase()));
-  }, [brands, q]);
+    let list = brands;
+    // While editing, surface the current brand at the top of the list so the
+    // customer can confirm or change it without scrolling.
+    if (isEditing && currentBrandId) {
+      const current = brands.find((b) => b.id === currentBrandId);
+      const rest = brands.filter((b) => b.id !== currentBrandId);
+      list = current ? [current, ...rest] : brands;
+    }
+    if (!q.trim()) return list;
+    return list.filter((b) => (b.name || '').toLowerCase().includes(q.toLowerCase()));
+  }, [brands, q, isEditing, currentBrandId]);
 
   const onPick = (b) => navigation.navigate('SelectSeries', {
     flow, categoryId, categoryCode, categoryName, deviceTypeId, deviceTypeName,
     brandId: b.id, brandName: b.name,
+    editSellOrderId, editHints,
   });
 
   const crumbs = [{ label: 'Category', value: categoryName }];
@@ -51,6 +65,17 @@ export default function SelectBrandScreen({ navigation, route }) {
     <View className="flex-1 bg-background">
       <View className="bg-card border-b border-border px-4 pt-3 pb-3">
         <SelectionCrumb items={crumbs} className="mb-3" />
+        {isEditing && editHints?.modelName ? (
+          <View className="bg-warning/10 border border-warning/30 rounded-xl px-3 py-2 mb-3 flex-row items-center">
+            <Pencil size={13} color="#F59E0B" />
+            <View className="flex-1 ml-2">
+              <Text className="text-[10px] font-extrabold text-warning tracking-wider">EDITING ORDER</Text>
+              <Text className="text-[12px] text-text font-semibold" numberOfLines={1}>
+                Currently: {editHints.brandName ? `${editHints.brandName} · ` : ''}{editHints.modelName}
+              </Text>
+            </View>
+          </View>
+        ) : null}
         <SearchBar value={q} onChangeText={setQ} placeholder="Search brand" onClear={() => setQ('')} />
       </View>
 
@@ -65,12 +90,20 @@ export default function SelectBrandScreen({ navigation, route }) {
             const palette = paletteFor(b.name);
             const initial = (b.name || '?').slice(0, 1).toUpperCase();
             const logo = b.imageUrl || b.imageBase64;
+            const isCurrent = isEditing && b.id === currentBrandId;
             return (
               <Pressable
                 key={b.id}
                 onPress={() => onPick(b)}
-                className="flex-row items-center bg-card border border-border rounded-2xl p-3 mb-3 active:opacity-80"
-                style={{ shadowColor: '#0F172A', shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 1 }}
+                className={`flex-row items-center bg-card border rounded-2xl p-3 mb-3 active:opacity-80 ${isCurrent ? 'border-success' : 'border-border'}`}
+                style={{
+                  shadowColor: isCurrent ? '#10B981' : '#0F172A',
+                  shadowOpacity: isCurrent ? 0.10 : 0.04,
+                  shadowRadius: 8,
+                  shadowOffset: { width: 0, height: 2 },
+                  elevation: 1,
+                  borderWidth: isCurrent ? 2 : 1,
+                }}
               >
                 <View className="h-11 w-11 rounded-xl items-center justify-center mr-3 overflow-hidden bg-white border border-border">
                   {logo ? (
@@ -81,7 +114,15 @@ export default function SelectBrandScreen({ navigation, route }) {
                     </View>
                   )}
                 </View>
-                <Text className="flex-1 text-[15px] font-extrabold text-text" numberOfLines={1}>{b.name}</Text>
+                <View className="flex-1">
+                  <Text className="text-[15px] font-extrabold text-text" numberOfLines={1}>{b.name}</Text>
+                  {isCurrent ? (
+                    <View className="flex-row items-center mt-0.5">
+                      <CheckCircle2 size={11} color="#10B981" />
+                      <Text className="text-[10px] font-bold text-success ml-1">Current selection · tap to keep</Text>
+                    </View>
+                  ) : null}
+                </View>
                 <ChevronRight size={18} color="#94A3B8" />
               </Pressable>
             );

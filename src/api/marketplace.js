@@ -12,6 +12,11 @@ export async function getProduct(id) {
   return await marketplaceApi.get(`/marketplace/products/${id}`);
 }
 
+// Buy/Sell board (peer marketplace listings)
+export async function createListing(payload) {
+  return await marketplaceApi.post('/marketplace/listings', { body: payload });
+}
+
 // Cart
 export async function getCart() {
   return unwrap(await marketplaceApi.get('/customer/cart'));

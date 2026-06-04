@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, ScrollView, Text, View } from 'react-native';
-import { ChevronRight, Smartphone } from 'lucide-react-native';
+import { Check, ChevronRight, Smartphone } from 'lucide-react-native';
 import {
   EmptyState, Loader, ScreenHeader, SearchBar, SelectionCrumb,
 } from '../../../components/rnr';
@@ -10,7 +10,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 export default function SelectDeviceModelScreen({ navigation, route }) {
   const params = route?.params || {};
-  const { categoryId, brandId, brandName, seriesId, seriesName } = params;
+  const { categoryId, brandId, brandName, seriesId, seriesName, editMode, modelId: currentModelId } = params;
   const [models, setModels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
@@ -38,10 +38,20 @@ export default function SelectDeviceModelScreen({ navigation, route }) {
   }, [brandId, seriesId, categoryId]);
 
   const filtered = useMemo(() => {
-    if (!q.trim()) return models;
-    const needle = q.toLowerCase();
-    return models.filter((m) => (m.name || '').toLowerCase().includes(needle));
-  }, [models, q]);
+    const base = !q.trim()
+      ? models
+      : models.filter((m) => (m.name || '').toLowerCase().includes(q.toLowerCase()));
+    if (editMode && currentModelId) {
+      const idx = base.findIndex((m) => m.id === currentModelId);
+      if (idx > 0) {
+        const copy = base.slice();
+        const [cur] = copy.splice(idx, 1);
+        copy.unshift(cur);
+        return copy;
+      }
+    }
+    return base;
+  }, [models, q, editMode, currentModelId]);
 
   const onPick = (m) => {
     const imageUrl = m.imageUrl || (m.imageBase64 ? `data:image/png;base64,${m.imageBase64}` : null);
@@ -75,11 +85,12 @@ export default function SelectDeviceModelScreen({ navigation, route }) {
             filtered.map((m) => {
               const thumb = m.imageUrl || m.imageBase64;
               const sub = m.subtitle || m.seriesName || m.slug;
+              const isCurrent = editMode && currentModelId === m.id;
               return (
                 <Pressable
                   key={m.id}
                   onPress={() => onPick(m)}
-                  className="flex-row items-center bg-card border border-border rounded-2xl p-3.5 mb-3 active:opacity-80"
+                  className={`flex-row items-center bg-card border rounded-2xl p-3.5 mb-3 active:opacity-80 ${isCurrent ? 'border-primary' : 'border-border'}`}
                   style={{ shadowColor: '#0F172A', shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 1 }}
                 >
                   <View className="h-12 w-12 rounded-xl bg-primary/10 items-center justify-center mr-3 overflow-hidden">
@@ -93,6 +104,12 @@ export default function SelectDeviceModelScreen({ navigation, route }) {
                     <Text className="text-[14px] font-extrabold text-text" numberOfLines={1}>{m.name}</Text>
                     {sub ? <Text className="text-[12px] text-text-muted mt-0.5" numberOfLines={1}>{sub}</Text> : null}
                   </View>
+                  {isCurrent ? (
+                    <View className="flex-row items-center bg-primary/10 border border-primary/30 rounded-full px-2 py-0.5 mr-1">
+                      <Check size={10} color="#00008B" />
+                      <Text className="text-[10px] font-extrabold text-primary ml-1">Current</Text>
+                    </View>
+                  ) : null}
                   <ChevronRight size={18} color="#94A3B8" />
                 </Pressable>
               );

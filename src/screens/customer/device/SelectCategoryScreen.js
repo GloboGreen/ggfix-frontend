@@ -41,12 +41,15 @@ export default function SelectCategoryScreen({ navigation, route }) {
     return cats.filter((c) => (c.name || '').toLowerCase().includes(needle));
   }, [cats, q]);
 
-  // Tap auto-advances straight to the brand step.
+  // Tap auto-advances straight to the brand step. Forward `editSellOrderId`
+  // (set when entering the wizard from "Edit sell order") so SellComplete can
+  // PUT instead of POST at the end of the flow.
   const onPick = (c) => navigation.navigate('SelectBrand', {
     flow,
     categoryId: c.id,
     categoryCode: (c.code || '').toUpperCase(),
     categoryName: c.name,
+    editSellOrderId: route?.params?.editSellOrderId,
   });
 
   if (loading) return <Loader label="Loading categories..." />;

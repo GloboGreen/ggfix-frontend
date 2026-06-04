@@ -78,15 +78,17 @@ export default function RepairShopDetailsScreen({ navigation, route }) {
   const centered = { width: '100%', maxWidth: MAX_W, alignSelf: 'center' };
 
   useEffect(() => {
+    if (locLoading) return;
     (async () => {
       try {
-        const s = await getShop(shopId).catch(() => null);
+        const args = lat != null && lng != null ? { lat, lng } : undefined;
+        const s = await getShop(shopId, args).catch(() => null);
         setShop(s);
       } finally {
         setLoading(false);
       }
     })();
-  }, [shopId]);
+  }, [shopId, lat, lng, locLoading]);
 
   useEffect(() => {
     if (locLoading) return;
@@ -116,7 +118,7 @@ export default function RepairShopDetailsScreen({ navigation, route }) {
   const hoursText = shop.hoursText || '09:30 AM to 09:00 PM';
   const openDays = shop.openDays || 'Monday - Saturday';
 
-  const callShop = () => { if (shop.phone) Linking.openURL(`tel:${shop.phone}`).catch(() => {}); };
+  const callShop = () => { if ((shop.phone || shop.mobile)) Linking.openURL(`tel:${(shop.phone || shop.mobile)}`).catch(() => {}); };
   const directions = () => {
     const q = encodeURIComponent(shop.address || shop.name || '');
     const url = Platform.select({ ios: `http://maps.apple.com/?q=${q}`, default: `https://maps.google.com/?q=${q}` });
@@ -204,10 +206,10 @@ export default function RepairShopDetailsScreen({ navigation, route }) {
                   {shop.address || `${shop.city || ''}${shop.pincode ? ' ' + shop.pincode : ''}`}
                 </Text>
               </View>
-              {shop.phone ? (
+              {(shop.phone || shop.mobile) ? (
                 <View className="flex-row items-center mt-1">
                   <Phone size={12} color="#64748B" />
-                  <Text className="text-[12px] text-text-muted ml-1">{shop.phone}</Text>
+                  <Text className="text-[12px] text-text-muted ml-1">{(shop.phone || shop.mobile)}</Text>
                 </View>
               ) : null}
 

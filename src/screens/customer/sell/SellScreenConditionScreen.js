@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import colors from '../../../theme/colors';
 import { Card, PrimaryButton, Loader } from '../../../components/ui';
 import { getConditionGroups, getConditionOptions } from '../../../api/masterData';
@@ -11,6 +12,9 @@ const styles = StyleSheet.create({
   optTile: { width: '31.33%', marginHorizontal: '1%', marginBottom: 6, paddingVertical: 7, paddingHorizontal: 4, borderWidth: 1, borderColor: colors.border, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', minHeight: 44 },
   optTileActive: { borderColor: '#16A34A', borderWidth: 2 },
   optLabel: { fontSize: 10, lineHeight: 13, color: colors.text, textAlign: 'center', fontWeight: '600' },
+  editBanner: { backgroundColor: '#FEF3C7', borderColor: '#FCD34D', borderWidth: 1, borderRadius: 10, padding: 10, marginBottom: 4, flexDirection: 'row', alignItems: 'center' },
+  editBannerTitle: { fontSize: 10, fontWeight: '800', color: '#92400E', letterSpacing: 0.5 },
+  editBannerText: { fontSize: 12, color: colors.text, fontWeight: '600', marginTop: 2 },
   bottom: { padding: 12, backgroundColor: '#fff', borderTopColor: colors.border, borderTopWidth: 1 },
 });
 
@@ -34,27 +38,70 @@ const sortGroups = (arr) => [...arr].sort((a, b) => orderRank(a) - orderRank(b))
 
 export default function SellScreenConditionScreen({ navigation, route }) {
   const params = route.params || {};
+  const { editSellOrderId, editHints } = params;
+  const isEditing = !!editSellOrderId;
   const [groups, setGroups] = useState([]);
   const [optsByGroup, setOptsByGroup] = useState({});
   const [selected, setSelected] = useState({}); // groupId -> {id, label}
   const [loading, setLoading] = useState(true);
 
+  // Index previously-saved options by groupCode (canonical) and groupName
+  // (best-effort) so we can resolve them against whichever groups come back.
+  const priorByGroupCode = useMemo(() => {
+    const m = {};
+    (editHints?.conditions || []).forEach((c) => {
+      if (c?.groupCode) m[c.groupCode.toUpperCase()] = c;
+    });
+    return m;
+  }, [editHints]);
+  const priorByGroupName = useMemo(() => {
+    const m = {};
+    (editHints?.conditions || []).forEach((c) => {
+      if (c?.groupName) m[c.groupName.trim().toLowerCase()] = c;
+    });
+    return m;
+  }, [editHints]);
+
   useEffect(() => {
     (async () => {
       try {
         const list = await getConditionGroups(params.device?.categoryId);
-        if (list.length === 0) {
-          setGroups(sortGroups(FALLBACK_GROUPS));
-        } else {
-          const sorted = sortGroups(list);
-          setGroups(sorted);
-          const map = {};
-          for (const g of sorted) {
+        const sortedGroups = list.length === 0
+          ? sortGroups(FALLBACK_GROUPS)
+          : sortGroups(list);
+        setGroups(sortedGroups);
+
+        const map = {};
+        if (list.length !== 0) {
+          for (const g of sortedGroups) {
             map[g.id] = await getConditionOptions(g.id).catch(() => []);
           }
           setOptsByGroup(map);
         }
-      } catch (_) { setGroups(sortGroups(FALLBACK_GROUPS)); }
+
+        // Seed previously-saved selections.
+        if (isEditing) {
+          const seed = {};
+          for (const g of sortedGroups) {
+            const prior = priorByGroupCode[(g.code || '').toUpperCase()]
+              || priorByGroupName[(g.name || '').trim().toLowerCase()];
+            if (!prior) continue;
+            // Match by optionId when both sides have UUIDs.
+            const opts = (map[g.id]?.length ? map[g.id] : (g.options || []).map((o, i) => ({ id: `${g.id}-${i}`, label: o })));
+            const byId = prior.optionId ? opts.find((o) => o.id === prior.optionId) : null;
+            const byLabel = prior.optionLabel
+              ? opts.find((o) => (o.label || '').trim().toLowerCase() === prior.optionLabel.trim().toLowerCase())
+              : null;
+            const opt = byId || byLabel;
+            if (opt) {
+              seed[g.id] = { id: opt.id, label: opt.label, groupCode: g.code, groupName: g.name };
+            }
+          }
+          if (Object.keys(seed).length) setSelected(seed);
+        }
+      } catch (_) {
+        setGroups(sortGroups(FALLBACK_GROUPS));
+      }
       setLoading(false);
     })();
   }, []);
@@ -64,6 +111,15 @@ export default function SellScreenConditionScreen({ navigation, route }) {
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={{ padding: 12 }}>
+        {isEditing ? (
+          <View style={styles.editBanner}>
+            <Ionicons name="create-outline" size={16} color="#92400E" />
+            <View style={{ flex: 1, marginLeft: 8 }}>
+              <Text style={styles.editBannerTitle}>EDITING ORDER</Text>
+              <Text style={styles.editBannerText}>Your previous condition picks are pre-selected.</Text>
+            </View>
+          </View>
+        ) : null}
         {groups.map((g) => {
           const opts = (optsByGroup[g.id]?.length ? optsByGroup[g.id] : (g.options || []).map((o, i) => ({ id: `${g.id}-${i}`, label: o })));
           return (

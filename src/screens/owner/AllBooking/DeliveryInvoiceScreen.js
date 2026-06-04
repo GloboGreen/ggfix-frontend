@@ -7,7 +7,7 @@ import { notify } from '../../../components/confirm';
 import { ticketApi } from '../../../api/client';
 
 function formatDate(iso) {
-  if (!iso) return 'â€”';
+  if (!iso) return '—';
   try {
     return new Date(iso).toLocaleString('en-IN', {
       day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
@@ -15,29 +15,40 @@ function formatDate(iso) {
   } catch { return iso; }
 }
 
+function priceItemsFromTicket(ticket) {
+  if (Array.isArray(ticket.priceItems)) return ticket.priceItems;
+  if (ticket.priceItemsJson) {
+    try {
+      const parsed = JSON.parse(ticket.priceItemsJson);
+      if (Array.isArray(parsed)) return parsed;
+    } catch (_) {}
+  }
+  return ticket.services?.map?.((s) => ({ id: s.id, label: s.serviceName, amount: s.price })) || [];
+}
+
 function buildReceiptText(t) {
-  const items = t.priceItems || t.services?.map?.((s) => ({ label: s.serviceName, amount: s.price })) || [];
+  const items = priceItemsFromTicket(t);
   const subtotal = items.reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
   const tax = Math.round(subtotal * 0.18);
   const total = subtotal + tax;
   return (
-    `ðŸ§¾ GGFix â€” Delivery Invoice\n` +
+    `🧾 GGFix — Delivery Invoice\n` +
     `â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•\n` +
     `Receipt #: ${t.trackingId || t.id}\n` +
     `Date: ${formatDate(t.deliveredAt || t.createdAt)}\n\n` +
     `From: ${t.shopName || 'GGFix Service Center'}\n` +
     `${t.shopAddress || ''}\n` +
     `${t.shopPhone ? 'Ph: ' + t.shopPhone : ''}\n\n` +
-    `To: ${t.customerName || 'â€”'}\n` +
+    `To: ${t.customerName || '—'}\n` +
     `${t.customerPhone ? 'Mobile: ' + t.customerPhone : ''}\n` +
     `${t.customerAddress || ''}\n\n` +
-    `Device: ${t.deviceModelName || t.modelName || 'â€”'}\n\n` +
+    `Device: ${t.deviceDisplayName || t.deviceModelName || t.modelName || '—'}\n\n` +
     `â”€â”€â”€ Services â”€â”€â”€\n` +
-    items.map((i, idx) => `${idx + 1}. ${i.label}   â‚¹${Number(i.amount || 0).toLocaleString('en-IN')}`).join('\n') +
-    `\n\nSubtotal: â‚¹${subtotal.toLocaleString('en-IN')}\n` +
-    `GST (18%): â‚¹${tax.toLocaleString('en-IN')}\n` +
+    items.map((i, idx) => `${idx + 1}. ${i.label}   ₹${Number(i.amount || 0).toLocaleString('en-IN')}`).join('\n') +
+    `\n\nSubtotal: ₹${subtotal.toLocaleString('en-IN')}\n` +
+    `GST (18%): ₹${tax.toLocaleString('en-IN')}\n` +
     `â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€\n` +
-    `Total: â‚¹${total.toLocaleString('en-IN')}\n\n` +
+    `Total: ₹${total.toLocaleString('en-IN')}\n\n` +
     `Thank you for choosing GGFix!\n` +
     `30-day repair warranty included.`
   );
@@ -64,7 +75,7 @@ export default function DeliveryInvoiceScreen({ navigation, route }) {
   if (loading) return <Loader label="Loading invoice..." />;
 
   const t = ticket || {};
-  const items = t.priceItems || t.services?.map?.((s) => ({ id: s.id, label: s.serviceName, amount: s.price })) || [];
+  const items = priceItemsFromTicket(t);
   const subtotal = items.reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
   const tax = Math.round(subtotal * 0.18);
   const total = subtotal + tax;
@@ -115,7 +126,7 @@ export default function DeliveryInvoiceScreen({ navigation, route }) {
           <View className="flex-row -mx-1">
             <View className="px-1 flex-1">
               <Text className="text-[10px] text-text-muted">Receipt No.</Text>
-              <Text className="text-[12px] font-extrabold text-text" numberOfLines={1}>{t.trackingId || t.id || 'â€”'}</Text>
+              <Text className="text-[12px] font-extrabold text-text" numberOfLines={1}>{t.trackingId || t.id || '—'}</Text>
             </View>
             <View className="px-1 flex-1">
               <Text className="text-[10px] text-text-muted">Date</Text>
@@ -127,7 +138,7 @@ export default function DeliveryInvoiceScreen({ navigation, route }) {
         {/* Bill to */}
         <Card className="rounded-2xl mb-2.5">
           <CardTitle className="mb-1">Bill To</CardTitle>
-          <Text className="text-[12px] font-bold text-text">{t.customerName || 'â€”'}</Text>
+          <Text className="text-[12px] font-bold text-text">{t.customerName || '—'}</Text>
           {t.customerPhone ? <Text className="text-[11px] text-text-muted">{t.customerPhone}</Text> : null}
           {t.customerAddress ? <Text className="text-[11px] text-text-muted leading-4 mt-0.5">{t.customerAddress}</Text> : null}
         </Card>
@@ -148,16 +159,16 @@ export default function DeliveryInvoiceScreen({ navigation, route }) {
               <Text className="text-[11px] text-text w-6">{i + 1}</Text>
               <Text className="text-[11px] text-text flex-1 pr-2" numberOfLines={2}>{item.label}</Text>
               <Text className="text-[11px] font-bold text-text text-right" style={{ width: 70 }}>
-                â‚¹{Number(item.amount || 0).toLocaleString('en-IN')}
+                ₹{Number(item.amount || 0).toLocaleString('en-IN')}
               </Text>
             </View>
           ))}
 
           <View className="mt-1.5">
-            <PriceRow label="Subtotal" value={`â‚¹${subtotal.toLocaleString('en-IN')}`} />
-            <PriceRow label="GST (18%)" value={`â‚¹${tax.toLocaleString('en-IN')}`} />
+            <PriceRow label="Subtotal" value={`₹${subtotal.toLocaleString('en-IN')}`} />
+            <PriceRow label="GST (18%)" value={`₹${tax.toLocaleString('en-IN')}`} />
             <PriceDivider />
-            <PriceRow label="Total" value={`â‚¹${total.toLocaleString('en-IN')}`} bold />
+            <PriceRow label="Total" value={`₹${total.toLocaleString('en-IN')}`} bold />
           </View>
         </Card>
 

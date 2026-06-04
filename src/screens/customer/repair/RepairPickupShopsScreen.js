@@ -127,14 +127,6 @@ export default function RepairPickupShopsScreen({ navigation, route }) {
     }
   }, [lat, lng, radiusKm]);
 
-  const useDemoLocation = () => {
-    if (typeof window !== 'undefined') {
-      // Cuddalore â€” matches the seeded demo shops.
-      window.__GGFIX_FORCE_LOCATION = { lat: 11.7480, lng: 79.7714, label: 'Cuddalore (demo)' };
-      refreshLoc();
-    }
-  };
-
   useEffect(() => { if (!locLoading) fetchShops(); }, [locLoading, fetchShops]);
 
   const filtered = useMemo(() => {
@@ -173,14 +165,6 @@ export default function RepairPickupShopsScreen({ navigation, route }) {
               ? `Near ${addressLabel || 'you'} · within ${radiusKm} km`
               : (locError ? `Location: ${locError}` : 'Resolving your location…')}
           </Text>
-          {source !== 'override' ? (
-            <Pressable
-              onPress={useDemoLocation}
-              className="bg-white/15 rounded-full px-2 py-0.5 ml-2 active:opacity-70"
-            >
-              <Text className="text-white text-[10px] font-bold">Use demo</Text>
-            </Pressable>
-          ) : null}
         </View>
       </LinearGradient>
 
@@ -226,10 +210,10 @@ export default function RepairPickupShopsScreen({ navigation, route }) {
               </Text>
             </View>
             <Pressable
-              onPress={useDemoLocation}
+              onPress={refreshLoc}
               className="bg-warning rounded-full px-2.5 py-1 active:opacity-70 ml-1"
             >
-              <Text className="text-white text-[10px] font-bold">Use demo loc</Text>
+              <Text className="text-white text-[10px] font-bold">Retry</Text>
             </Pressable>
           </View>
         ) : null}

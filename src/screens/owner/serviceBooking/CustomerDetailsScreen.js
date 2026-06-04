@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
-import { UserPlus, ChevronDown, Upload, Save, MapPin } from 'lucide-react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { UserPlus, ChevronDown, Upload, Save, MapPin, Search, CheckCircle2 } from 'lucide-react-native';
 import { Button, Input, Label, ScreenHeader, Select } from '../../../components/rnr';
 import { ticketApi } from '../../../api/client';
 import { notify } from '../../../components/confirm';
@@ -35,18 +35,96 @@ function Field({ label, required, children, half = false, className }) {
 
 export default function CustomerDetailsScreen({ navigation, route }) {
   const initial = route?.params?.initial || {};
+  // The picker passes the resolved customer in `existing`; the ticket-service
+  // CustomerResponse now carries structured address fields (state/city/
+  // locality/addressLine/pincode) sourced from the platform customer_addresses
+  // row. Fall back to `initial` so callers that already split the address
+  // themselves still work.
+  const existingPick = route?.params?.existing || {};
   const [data, setData] = useState({
     name: initial.name || '',
     phone: initial.phone || '',
     email: initial.email || '',
-    state: initial.state || 'Tamil Nadu',
-    district: initial.district || '',
+    state: initial.state || existingPick.state || 'Tamil Nadu',
+    district: initial.district || existingPick.city || '',
     taluk: initial.taluk || '',
-    area: initial.area || '',
-    addressLine: initial.addressLine || '',
-    pincode: initial.pincode || '',
+    area: initial.area || existingPick.locality || '',
+    addressLine: initial.addressLine || existingPick.addressLine || '',
+    pincode: initial.pincode || existingPick.pincode || '',
   });
   const [saving, setSaving] = useState(false);
+  const [lookupLoading, setLookupLoading] = useState(false);
+  // When a lookup hits an existing customer (shop or platform), remember the
+  // resolved row so Save & Continue can reuse / link it instead of creating
+  // a duplicate. Cleared whenever the phone field changes.
+  // Pre-seeded when the caller already picked an existing customer (e.g. from
+  // the New Booking search results) so we skip the lookup round-trip.
+  const [existing, setExisting] = useState(route?.params?.existing || null);
+  // Don't pre-seed: even when the picker handed us an `existing` row, the
+  // search endpoint may have returned it without the structured address
+  // overlay. Letting the auto-lookup run once re-fetches via /customers/lookup
+  // which guarantees state/city/locality/addressLine/pincode from the platform
+  // customer_addresses row.
+  const lastLookedUpPhoneRef = useRef('');
+  const prePickedRef = useRef(!!route?.params?.existing);
+
+  const doLookup = async (rawPhone, { silentMissing = false, silentFound = false } = {}) => {
+    const phone = (rawPhone || '').replace(/[\s+\-]/g, '');
+    if (phone.length < 10) return;
+    if (lastLookedUpPhoneRef.current === phone && existing) return;
+    lastLookedUpPhoneRef.current = phone;
+    setLookupLoading(true);
+    try {
+      const found = await ticketApi.get('/customers/lookup', { query: { mobile: phone } });
+      if (!found) {
+        setExisting(null);
+        if (!silentMissing) {
+          notify('New customer', 'No existing customer with this mobile. Fill in the details to create one.');
+        }
+        return;
+      }
+      setExisting(found);
+      setData((d) => ({
+        ...d,
+        name: found.name || d.name,
+        phone: found.phone || d.phone,
+        email: found.email || d.email,
+        state: found.state || d.state,
+        district: found.city || d.district,
+        area: found.locality || d.area,
+        addressLine: found.addressLine || d.addressLine,
+        pincode: found.pincode || d.pincode,
+      }));
+      if (!silentFound) {
+        const where = found.source === 'platform'
+          ? 'This mobile is registered in the app. Details auto-filled — review and Save & Continue to add them to this shop.'
+          : 'This customer already exists in this shop. Details auto-filled — Save & Continue will reuse them.';
+        notify('Customer found', where);
+      }
+    } catch (_) {
+      // Network or other error: stay silent on auto-lookup, surface on manual.
+      if (!silentMissing) notify('Lookup failed', 'Could not check existing customers. Continue manually.');
+    } finally {
+      setLookupLoading(false);
+    }
+  };
+
+  // Auto-lookup once the phone reaches 10 digits, debounced.
+  useEffect(() => {
+    const phone = (data.phone || '').replace(/[\s+\-]/g, '');
+    if (phone.length < 10) {
+      if (existing) setExisting(null);
+      lastLookedUpPhoneRef.current = '';
+      return;
+    }
+    const wasPrePicked = prePickedRef.current;
+    prePickedRef.current = false;
+    const t = setTimeout(() => {
+      doLookup(data.phone, { silentMissing: true, silentFound: wasPrePicked });
+    }, 400);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.phone]);
 
   const save = async () => {
     if (!data.name.trim() || !data.phone.trim()) {
@@ -55,15 +133,25 @@ export default function CustomerDetailsScreen({ navigation, route }) {
     }
     setSaving(true);
     try {
-      const created = await ticketApi.post('/customers', {
-        body: {
-          name: data.name.trim(),
-          phone: data.phone.trim(),
-          email: data.email.trim() || null,
-          address: [data.addressLine, data.area, data.taluk, data.district, data.state, data.pincode].filter(Boolean).join(', '),
-        },
-      });
-      navigation.replace('ChooseDevice', { customerId: created.id, customer: created });
+      let resolved = existing;
+      // If we have a platform match, materialize the shop-scoped row now.
+      if (resolved && resolved.source === 'platform') {
+        resolved = await ticketApi.post('/customers/link', {
+          body: { platformUserId: resolved.platformUserId || resolved.id },
+        });
+      }
+      // Nothing matched — create a fresh shop customer.
+      if (!resolved) {
+        resolved = await ticketApi.post('/customers', {
+          body: {
+            name: data.name.trim(),
+            phone: data.phone.trim(),
+            email: data.email.trim() || null,
+            address: [data.addressLine, data.area, data.taluk, data.district, data.state, data.pincode].filter(Boolean).join(', '),
+          },
+        });
+      }
+      navigation.replace('ChooseDevice', { customerId: resolved.id, customer: resolved });
     } catch (e) {
       notify('Error', e?.message || 'Failed to save customer');
     } finally { setSaving(false); }
@@ -93,14 +181,34 @@ export default function CustomerDetailsScreen({ navigation, route }) {
                 <Text className="text-[13px] text-text font-semibold">+91</Text>
                 <ChevronDown size={12} color="#64748B" />
               </Pressable>
-              <Input
-                className={`flex-1 ${INPUT_CLS}`}
-                placeholder="10-digit number"
-                keyboardType="phone-pad"
-                value={data.phone}
-                onChangeText={(v) => setData({ ...data, phone: v })}
-              />
+              <View className="flex-1 relative">
+                <Input
+                  className={`${INPUT_CLS} pr-9`}
+                  placeholder="10-digit number"
+                  keyboardType="phone-pad"
+                  value={data.phone}
+                  onChangeText={(v) => setData({ ...data, phone: v })}
+                />
+                <Pressable
+                  onPress={() => doLookup(data.phone)}
+                  className="absolute right-2 top-0 bottom-0 items-center justify-center px-1"
+                  hitSlop={6}
+                >
+                  {lookupLoading ? (
+                    <ActivityIndicator size="small" color="#00008B" />
+                  ) : existing ? (
+                    <CheckCircle2 size={18} color="#10B981" />
+                  ) : (
+                    <Search size={18} color="#64748B" />
+                  )}
+                </Pressable>
+              </View>
             </View>
+            {existing ? (
+              <Text className="text-[10px] text-success mt-1">
+                {existing.source === 'platform' ? 'App user found — will be linked to this shop' : 'Existing customer in this shop'}
+              </Text>
+            ) : null}
           </Field>
 
           <Field label="Email Address" className="mb-0">

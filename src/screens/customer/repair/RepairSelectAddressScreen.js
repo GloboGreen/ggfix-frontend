@@ -92,7 +92,7 @@ export default function RepairSelectAddressScreen({ navigation, route }) {
                       {a.isDefault ? <Badge variant="softSuccess">DEFAULT</Badge> : null}
                     </View>
                     {(a.fullName || a.mobile) ? (
-                      <Text className="text-[12px] text-text-muted mt-1">{a.fullName}{a.mobile ? ` Â· ${a.mobile}` : ''}</Text>
+                      <Text className="text-[12px] text-text-muted mt-1">{a.fullName}{a.mobile ? ` · ${a.mobile}` : ''}</Text>
                     ) : null}
                     <Text className="text-[12px] text-text mt-1 leading-5">
                       {[a.addressLine, a.locality, a.city, a.state, a.pincode].filter(Boolean).join(', ')}

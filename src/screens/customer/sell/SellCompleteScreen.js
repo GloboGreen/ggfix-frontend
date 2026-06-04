@@ -4,7 +4,9 @@ import { notify } from '../../../components/confirm';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../../../theme/colors';
 import { Card, PrimaryButton } from '../../../components/ui';
-import { createSellOrder } from '../../../api/orders';
+import { createSellOrder, updateSellOrder } from '../../../api/orders';
+import { createListing } from '../../../api/marketplace';
+import { getSession } from '../../../auth/session';
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
@@ -71,7 +73,52 @@ export default function SellCompleteScreen({ navigation, route }) {
         accessories: p.accessories || [],
         images,
       };
+
+      // When the customer entered this flow via "Edit sell order", PUT the
+      // existing order instead of creating a new one — and don't re-mirror to
+      // the marketplace listing (the original listing already points at it).
+      if (p.editSellOrderId) {
+        const updated = await updateSellOrder(p.editSellOrderId, payload);
+        // navigate() pops back to the existing SellOrderDetails route if it's
+        // still on the stack; otherwise it pushes a fresh one. Either way the
+        // customer lands on the details page, which refetches on focus.
+        navigation.navigate('SellOrderDetails', { sellOrderId: p.editSellOrderId, sellOrder: updated });
+        return;
+      }
+
       const created = await createSellOrder(payload);
+
+      // Mirror this sell-order onto the public Buy/Sell marketplace so nearby
+      // shops can spot it from their Buy screen. Best-effort — never block the
+      // success flow if the marketplace POST fails (e.g. service is down).
+      try {
+        const session = (await getSession()) || {};
+        const lat = address.latitude != null ? Number(address.latitude) : null;
+        const lng = address.longitude != null ? Number(address.longitude) : null;
+        const conditionLabel = p.deviceCondition
+          || (p.workingCondition === 'DEAD' ? 'Not working' : 'Used');
+        const summary = [device.color, storageLine].filter(Boolean).join(' · ');
+        if (session.userId && device.modelName) {
+          await createListing({
+            sellerType: 'CUSTOMER',
+            sellerId: session.userId,
+            brandId: device.brandId,
+            modelId: device.modelId,
+            productName: device.modelName,
+            productImage: images.front || device.imageUrl,
+            condition: conditionLabel,
+            description: summary || undefined,
+            expectedPrice: 0, // 0 = awaiting shop quotation
+            latitude: lat,
+            longitude: lng,
+            address: address.addressLine,
+            city: address.city,
+            state: address.state,
+            pincode: address.pincode,
+          });
+        }
+      } catch (_) { /* best-effort mirror */ }
+
       navigation.replace('SellSuccess', { sellOrder: created });
     } catch (e) {
       notify('Error', e.message);
@@ -182,7 +229,12 @@ export default function SellCompleteScreen({ navigation, route }) {
         ) : null}
       </ScrollView>
       <View style={styles.bottom}>
-        <PrimaryButton title="Sell Now →" onPress={submit} loading={saving} style={{ backgroundColor: '#16A34A' }} />
+        <PrimaryButton
+          title={p.editSellOrderId ? 'Update Order →' : 'Sell Now →'}
+          onPress={submit}
+          loading={saving}
+          style={{ backgroundColor: p.editSellOrderId ? '#2563EB' : '#16A34A' }}
+        />
       </View>
     </View>
   );

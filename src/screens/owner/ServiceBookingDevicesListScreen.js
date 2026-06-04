@@ -48,7 +48,7 @@ export default function ServiceBookingDevicesListScreen({ route, navigation }) {
         deviceImageUrl: first?.deviceImageUrl,
         repairServicesSummary: servicesSummary || first?.repairServicesSummary,
         priceItemsJson: JSON.stringify(first?.priceItems || []),
-        customerApproval: true,
+        customerApproval: false,
         estimatedReadyAt: first?.estimatedReadyAt || undefined,
         estimatedDeliveryAt: first?.estimatedDeliveryAt || undefined,
       };

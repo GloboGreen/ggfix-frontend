@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../../../theme/colors';
@@ -14,6 +14,9 @@ const styles = StyleSheet.create({
   warrantyRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 12, borderWidth: 1, borderColor: colors.border, borderRadius: 10, marginTop: 8 },
   warrantyRowActive: { borderColor: '#16A34A', backgroundColor: '#F0FDF4' },
   warrantyLabel: { marginLeft: 10, fontSize: 14, color: colors.text, fontWeight: '600' },
+  editBanner: { backgroundColor: '#FEF3C7', borderColor: '#FCD34D', borderWidth: 1, borderRadius: 10, padding: 10, marginBottom: 4, flexDirection: 'row', alignItems: 'center' },
+  editBannerTitle: { fontSize: 10, fontWeight: '800', color: '#92400E', letterSpacing: 0.5 },
+  editBannerText: { fontSize: 12, color: colors.text, fontWeight: '600', marginTop: 2 },
   bottom: { padding: 12, backgroundColor: '#fff', borderTopColor: colors.border, borderTopWidth: 1 },
 });
 
@@ -38,12 +41,32 @@ const NO_WARRANTY_KEYWORDS = ['LAPTOP', 'AUDIO', 'WATCH', 'HEADPHONE', 'EARBUD',
 
 export default function SellAccessoriesWarrantyScreen({ navigation, route }) {
   const params = route.params || {};
+  const { editSellOrderId, editHints } = params;
+  const isEditing = !!editSellOrderId;
   const categoryCode = String(params.device?.categoryCode || '').toUpperCase();
   const isLaptopLike = NO_WARRANTY_KEYWORDS.some((k) => categoryCode.includes(k));
   const ACCESSORIES = isLaptopLike ? LAPTOP_ACCESSORIES : MOBILE_ACCESSORIES;
 
-  const [accessories, setAccessories] = useState([]);
-  const [warranty, setWarranty] = useState(null);
+  // Pre-seed the multi-select accessories from the order's prior accessories.
+  // Match on accessoryCode (canonical) or label (fallback when codes drift).
+  const initialAccessories = useMemo(() => {
+    if (!isEditing) return [];
+    const priorCodes = new Set();
+    const priorLabels = new Set();
+    (editHints?.accessories || []).forEach((a) => {
+      if (a?.accessoryCode) priorCodes.add(String(a.accessoryCode).toLowerCase());
+      if (a?.label) priorLabels.add(String(a.label).trim().toLowerCase());
+    });
+    return ACCESSORIES.filter((a) =>
+      priorCodes.has(a.id.toLowerCase())
+      || priorLabels.has(a.label.trim().toLowerCase()),
+    ).map((a) => a.id);
+  }, [isEditing, editHints, ACCESSORIES]);
+
+  const initialWarranty = isEditing ? (editHints?.warrantyCode || null) : null;
+
+  const [accessories, setAccessories] = useState(initialAccessories);
+  const [warranty, setWarranty] = useState(initialWarranty);
 
   useEffect(() => {
     if (isLaptopLike) {
@@ -57,6 +80,15 @@ export default function SellAccessoriesWarrantyScreen({ navigation, route }) {
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={{ padding: 12 }}>
+        {isEditing ? (
+          <View style={styles.editBanner}>
+            <Ionicons name="create-outline" size={16} color="#92400E" />
+            <View style={{ flex: 1, marginLeft: 8 }}>
+              <Text style={styles.editBannerTitle}>EDITING ORDER</Text>
+              <Text style={styles.editBannerText}>Your previous accessories and warranty are pre-selected.</Text>
+            </View>
+          </View>
+        ) : null}
         <Card style={{ padding: 10, marginVertical: 4 }}>
           <Text style={styles.sectionTitle}>Accessories</Text>
           <View style={styles.row}>

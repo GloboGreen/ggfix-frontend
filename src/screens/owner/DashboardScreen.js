@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -22,9 +22,15 @@ import {
   ChevronRight,
   ShieldCheck,
   ClipboardList,
+  ArrowLeftRight,
+  Store,
+  X,
+  Check,
 } from 'lucide-react-native';
 import { ticketApi } from '../../api/client';
 import { Loader, SectionHeader, Badge } from '../../components/rnr';
+import { getSession } from '../../auth/session';
+import { fetchMe, switchShop } from '../../api/auth';
 
 function useBookingCounts() {
   const [counts, setCounts] = useState(null);
@@ -76,6 +82,36 @@ const STATUSES = [
 export default function DashboardScreen({ navigation }) {
   const { summary, loading, error, refresh } = useBookingCounts();
   const [refreshing, setRefreshing] = useState(false);
+  const [session, setSession] = useState(null);
+  const [showSwitcher, setShowSwitcher] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [switching, setSwitching] = useState(false);
+
+  const reloadSession = useCallback(async () => {
+    try { setSession(await fetchMe()); }
+    catch { try { setSession(await getSession()); } catch { setSession(null); } }
+  }, []);
+
+  useEffect(() => { reloadSession(); }, [reloadSession]);
+
+  const shopName = session?.shopName || (session?.shops?.find?.((s) => s.isActive)?.name) || 'Shop · Owner';
+  const shops = session?.shops || [];
+  const hasMultipleShops = shops.length > 1;
+
+  const handleSwitch = async (shopId) => {
+    if (!shopId || shopId === session?.shopId) { setShowSwitcher(false); return; }
+    setSwitching(true);
+    try {
+      await switchShop(shopId);
+      await reloadSession();
+      await refresh();      // refresh ticket counts for the new shop
+      setShowSwitcher(false);
+    } catch (e) {
+      setShowSwitcher(false);
+    } finally {
+      setSwitching(false);
+    }
+  };
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -110,13 +146,25 @@ export default function DashboardScreen({ navigation }) {
             </View>
             <View className="flex-1">
               <Text className="text-white/75 text-[10px]">Good day</Text>
-              <Text className="text-white text-[16px] font-extrabold leading-5">Shop · Owner</Text>
+              <Text className="text-white text-[16px] font-extrabold leading-5" numberOfLines={1}>{shopName}</Text>
               <View className="flex-row items-center mt-0.5">
                 <ShieldCheck size={10} color="#A7F3D0" />
                 <Text className="text-emerald-200 text-[9px] font-bold ml-1 tracking-wide">VERIFIED SHOP OWNER</Text>
               </View>
             </View>
-            <Pressable className="h-9 w-9 rounded-full bg-white/15 items-center justify-center active:opacity-80">
+            {hasMultipleShops ? (
+              <Pressable
+                onPress={() => setShowSwitcher(true)}
+                className="h-9 px-2.5 rounded-full bg-white/15 items-center justify-center active:opacity-80 flex-row mr-1.5"
+              >
+                <ArrowLeftRight size={14} color="#fff" />
+                <Text className="text-white text-[10px] font-bold ml-1">{shops.length}</Text>
+              </Pressable>
+            ) : null}
+            <Pressable
+              onPress={() => setShowNotifications(true)}
+              className="h-9 w-9 rounded-full bg-white/15 items-center justify-center active:opacity-80"
+            >
               <Bell size={16} color="#fff" />
             </Pressable>
           </View>
@@ -241,6 +289,85 @@ export default function DashboardScreen({ navigation }) {
           </Pressable>
         </View>
       </ScrollView>
+
+      {/* Shop switcher */}
+      <Modal visible={showSwitcher} transparent animationType="fade" onRequestClose={() => setShowSwitcher(false)}>
+        <Pressable
+          onPress={() => setShowSwitcher(false)}
+          style={{ flex: 1, backgroundColor: 'rgba(15,23,42,0.5)', justifyContent: 'flex-end' }}
+        >
+          <Pressable
+            onPress={(e) => e.stopPropagation()}
+            style={{ backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 28 }}
+          >
+            <View className="flex-row items-center justify-between mb-2">
+              <Text className="text-[16px] font-extrabold text-text">Switch Shop</Text>
+              <Pressable onPress={() => setShowSwitcher(false)} hitSlop={8}><X size={20} color="#0F172A" /></Pressable>
+            </View>
+            <Text className="text-[12px] text-text-muted mb-3">Choose which of your shops to manage.</Text>
+            {shops.map((s) => {
+              const active = s.id === session?.shopId;
+              return (
+                <Pressable
+                  key={s.id}
+                  onPress={() => handleSwitch(s.id)}
+                  disabled={switching || active}
+                  className={`flex-row items-center py-3 px-3 rounded-xl border mb-2 ${active ? 'border-primary bg-primary/10' : 'border-border'}`}
+                >
+                  <View className={`h-8 w-8 rounded-lg ${active ? 'bg-primary' : 'bg-primary/10'} items-center justify-center mr-2.5`}>
+                    <Store size={14} color={active ? '#fff' : '#00008B'} />
+                  </View>
+                  <View className="flex-1">
+                    <Text className={`text-[14px] font-bold ${active ? 'text-primary' : 'text-text'}`} numberOfLines={1}>{s.name}</Text>
+                    <Text className="text-[11px] text-text-muted mt-0.5" numberOfLines={1}>{s.slug}</Text>
+                  </View>
+                  {active ? (
+                    <View className="h-6 w-6 rounded-full bg-emerald-100 items-center justify-center">
+                      <Check size={14} color="#10B981" />
+                    </View>
+                  ) : null}
+                </Pressable>
+              );
+            })}
+            {switching ? (
+              <View className="flex-row items-center justify-center mt-1">
+                <ActivityIndicator color="#00008B" />
+                <Text className="text-[12px] text-text-muted ml-2">Switching…</Text>
+              </View>
+            ) : null}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Notifications placeholder (real feed wires later) */}
+      <Modal visible={showNotifications} transparent animationType="fade" onRequestClose={() => setShowNotifications(false)}>
+        <Pressable
+          onPress={() => setShowNotifications(false)}
+          style={{ flex: 1, backgroundColor: 'rgba(15,23,42,0.5)', justifyContent: 'flex-end' }}
+        >
+          <Pressable
+            onPress={(e) => e.stopPropagation()}
+            style={{ backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 28, minHeight: 220 }}
+          >
+            <View className="flex-row items-center justify-between mb-2">
+              <View className="flex-row items-center">
+                <Bell size={16} color="#0F172A" />
+                <Text className="text-[16px] font-extrabold text-text ml-1.5">Notifications</Text>
+              </View>
+              <Pressable onPress={() => setShowNotifications(false)} hitSlop={8}><X size={20} color="#0F172A" /></Pressable>
+            </View>
+            <View className="items-center py-8">
+              <View className="h-12 w-12 rounded-full bg-primary/10 items-center justify-center mb-2">
+                <Bell size={20} color="#00008B" />
+              </View>
+              <Text className="text-[13px] font-bold text-text">You're all caught up</Text>
+              <Text className="text-[11px] text-text-muted mt-1 text-center px-6">
+                Booking updates, payouts and team alerts for <Text className="font-bold text-text">{shopName}</Text> will appear here.
+              </Text>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }

@@ -1,14 +1,20 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../../../theme/colors';
 import { Card, Loader, PrimaryButton } from '../../../components/ui';
 import { notify } from '../../../components/confirm';
 import { getProduct, addToCart } from '../../../api/marketplace';
+import { getShop } from '../../../api/shops';
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  hero: { height: 200, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', borderBottomColor: colors.border, borderBottomWidth: 1 },
+  hero: { height: 240, backgroundColor: '#F8FAFC', justifyContent: 'center', alignItems: 'center', borderBottomColor: colors.border, borderBottomWidth: 1 },
+  heroImage: { width: '100%', height: '100%' },
+  thumbsRow: { paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#fff', borderBottomColor: colors.border, borderBottomWidth: 1 },
+  thumb: { width: 56, height: 56, borderRadius: 8, marginRight: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: '#F8FAFC', overflow: 'hidden' },
+  thumbActive: { borderColor: '#00008B', borderWidth: 2 },
+  thumbImage: { width: '100%', height: '100%' },
   body: { padding: 12 },
   title: { fontSize: 18, fontWeight: '700', color: colors.text },
   price: { fontSize: 16, fontWeight: '700', color: '#16A34A' },
@@ -16,17 +22,50 @@ const styles = StyleSheet.create({
   iconWrap: { width: 30 },
   rowLabel: { width: 100, color: colors.textSecondary },
   rowVal: { flex: 1, color: colors.text, fontWeight: '600' },
+  shopHeading: { color: '#2563EB', fontWeight: '700', fontSize: 13 },
+  shopName: { fontSize: 14, fontWeight: '700', color: colors.text, marginTop: 6 },
+  shopLine: { fontSize: 13, color: colors.text, marginTop: 4 },
+  shopMuted: { fontSize: 12, color: colors.textSecondary, marginTop: 4 },
   bottom: { padding: 12, backgroundColor: '#fff', borderTopColor: colors.border, borderTopWidth: 1 },
 });
 
-export default function BuyProductDetailsScreen({ route, navigation }) {
+export default function BuyProductDetailsScreen({ route }) {
   const { productId } = route.params || {};
   const [p, setP] = useState(null);
+  const [shop, setShop] = useState(null);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
+  const [activeImage, setActiveImage] = useState(null);
+
   useEffect(() => {
-    (async () => { try { setP(await getProduct(productId)); } catch (_) {} setLoading(false); })();
+    let cancelled = false;
+    (async () => {
+      try {
+        const prod = await getProduct(productId);
+        if (cancelled) return;
+        setP(prod);
+        setActiveImage(prod?.imageUrl || (prod?.extraImageUrls && prod.extraImageUrls[0]) || null);
+        if (prod?.shopId) {
+          const sh = await getShop(prod.shopId).catch(() => null);
+          if (!cancelled) setShop(sh);
+        }
+      } catch (_) {
+        // leave p null -> show "Not found"
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [productId]);
+
+  const gallery = useMemo(() => {
+    if (!p) return [];
+    const out = [];
+    if (p.imageUrl) out.push(p.imageUrl);
+    (p.extraImageUrls || []).forEach((u) => { if (u && !out.includes(u)) out.push(u); });
+    return out;
+  }, [p]);
+
   const add = async () => {
     setAdding(true);
     try {
@@ -35,31 +74,82 @@ export default function BuyProductDetailsScreen({ route, navigation }) {
     } catch (e) { notify('Error', e.message); }
     finally { setAdding(false); }
   };
+
   if (loading) return <Loader />;
   if (!p) return <View style={styles.container}><Text style={{ padding: 16 }}>Not found</Text></View>;
+
+  const shopName = shop?.name || p.shopName;
+  const shopAddress = shop?.address || p.shopAddress;
+  const shopPhone = shop?.phone || shop?.mobile || p.shopPhone;
+  const shopCity = shop?.city || shop?.locality;
+
   return (
     <View style={styles.container}>
       <ScrollView>
         <View style={styles.hero}>
-          <Ionicons name="phone-portrait" size={120} color="#9CA3AF" />
+          {activeImage ? (
+            <Image source={{ uri: activeImage }} style={styles.heroImage} resizeMode="contain" />
+          ) : (
+            <Ionicons name="phone-portrait" size={120} color="#9CA3AF" />
+          )}
         </View>
+
+        {gallery.length > 1 ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbsRow}>
+            {gallery.map((uri) => {
+              const isActive = uri === activeImage;
+              return (
+                <Pressable key={uri} onPress={() => setActiveImage(uri)} style={[styles.thumb, isActive && styles.thumbActive]}>
+                  <Image source={{ uri }} style={styles.thumbImage} resizeMode="cover" />
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        ) : null}
+
         <View style={styles.body}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Text style={[styles.title, { flex: 1 }]}>{p.title}</Text>
             <Text style={styles.price}>Price : ₹{Number(p.price).toLocaleString()}</Text>
           </View>
+
           <Card>
             <View style={styles.row}><View style={styles.iconWrap}><Ionicons name="phone-portrait-outline" size={18} color={colors.text} /></View><Text style={styles.rowLabel}>Condition:</Text><Text style={styles.rowVal}>{p.conditionLabel || 'Good'}</Text></View>
             <View style={styles.row}><View style={styles.iconWrap}><Ionicons name="save-outline" size={18} color={colors.text} /></View><Text style={styles.rowLabel}>Storage:</Text><Text style={styles.rowVal}>{p.storageLabel || '-'}</Text></View>
             <View style={styles.row}><View style={styles.iconWrap}><Ionicons name="color-palette-outline" size={18} color={colors.text} /></View><Text style={styles.rowLabel}>Color:</Text><Text style={styles.rowVal}>{p.color || '-'}</Text></View>
             <View style={styles.row}><View style={styles.iconWrap}><Ionicons name="cellular-outline" size={18} color={colors.text} /></View><Text style={styles.rowLabel}>Network:</Text><Text style={styles.rowVal}>{p.network || '-'}</Text></View>
           </Card>
+
           <Card>
-            <Text style={{ color: '#2563EB', fontWeight: '700' }}>Shop Information</Text>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text, marginTop: 6 }}>🏬 {p.shopName}</Text>
-            <Text style={{ fontSize: 13, color: colors.text, marginTop: 4 }}>Shop Address: {p.shopAddress}</Text>
-            <Text style={{ fontSize: 13, color: colors.text, marginTop: 4 }}>📞 {p.shopPhone}</Text>
+            <Text style={styles.shopHeading}>Shop Information</Text>
+            {shopName ? (
+              <Text style={styles.shopName}>🏬 {shopName}</Text>
+            ) : (
+              <Text style={styles.shopMuted}>Shop details not available.</Text>
+            )}
+            {shopAddress ? (
+              <View style={{ flexDirection: 'row', marginTop: 4 }}>
+                <Ionicons name="location-outline" size={16} color={colors.text} style={{ marginTop: 2, marginRight: 4 }} />
+                <Text style={[styles.shopLine, { flex: 1 }]}>{shopAddress}</Text>
+              </View>
+            ) : null}
+            {shopCity ? (
+              <Text style={styles.shopMuted}>{shopCity}</Text>
+            ) : null}
+            {shopPhone ? (
+              <View style={{ flexDirection: 'row', marginTop: 4, alignItems: 'center' }}>
+                <Ionicons name="call-outline" size={16} color={colors.text} style={{ marginRight: 4 }} />
+                <Text style={styles.shopLine}>{shopPhone}</Text>
+              </View>
+            ) : null}
           </Card>
+
+          {p.description ? (
+            <Card>
+              <Text style={styles.shopHeading}>Description</Text>
+              <Text style={[styles.shopLine, { marginTop: 6 }]}>{p.description}</Text>
+            </Card>
+          ) : null}
         </View>
       </ScrollView>
       <View style={styles.bottom}>

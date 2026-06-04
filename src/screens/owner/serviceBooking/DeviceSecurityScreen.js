@@ -114,11 +114,14 @@ function PatternPad({ value, onChange }) {
 
 export default function DeviceSecurityScreen({ navigation, route }) {
   const params = route?.params || {};
+  const initialLock = (params.prefillLock && params.prefillLock.type)
+    ? { type: params.prefillLock.type, value: params.prefillLock.value || '' }
+    : { type: 'NONE', value: '' };
   const [open, setOpen] = useState(null); // 'pattern' | 'pin' | 'password' | null
-  const [pattern, setPattern] = useState('');
-  const [pin, setPin] = useState('');
-  const [password, setPassword] = useState('');
-  const [lock, setLock] = useState({ type: 'NONE', value: '' });
+  const [pattern, setPattern] = useState(initialLock.type === 'PATTERN' ? initialLock.value : '');
+  const [pin, setPin] = useState(initialLock.type === 'PIN' ? initialLock.value : '');
+  const [password, setPassword] = useState(initialLock.type === 'PASSWORD' ? initialLock.value : '');
+  const [lock, setLock] = useState(initialLock);
 
   const onSelect = (type) => {
     if (type === 'NONE') { setLock({ type: 'NONE', value: '' }); return; }

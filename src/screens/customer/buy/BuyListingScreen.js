@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../../../theme/colors';
 import { Loader, Empty } from '../../../components/ui';
 import { listProducts } from '../../../api/marketplace';
+import { getBrandsForCategory, getModelsByBrand } from '../../../api/masterData';
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, padding: 12 },
@@ -16,22 +17,67 @@ const styles = StyleSheet.create({
   dist: { fontSize: 12, color: '#16A34A', position: 'absolute', right: 12, top: 12, fontWeight: '700' },
   actionsRow: { flexDirection: 'row', borderTopColor: '#F0F4F8', borderTopWidth: 1 },
   action: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10 },
+  categoryBar: { paddingHorizontal: 4, paddingBottom: 8 },
+  categoryLabel: { fontSize: 12, color: colors.textSecondary, fontWeight: '600' },
+  categoryName: { fontSize: 16, color: colors.text, fontWeight: '800', marginTop: 2 },
 });
 
-export default function BuyListingScreen({ navigation }) {
+export default function BuyListingScreen({ navigation, route }) {
+  const { categoryId, categoryCode, categoryName, title } = route?.params || {};
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  useLayoutEffect(() => {
+    if (categoryName || title) {
+      navigation.setOptions({ title: categoryName || title });
+    }
+  }, [navigation, categoryName, title]);
+
   useEffect(() => {
+    let cancelled = false;
     (async () => {
-      try { setItems(await listProducts({ status: 'ACTIVE' })); } catch (_) {}
-      setLoading(false);
+      setLoading(true);
+      try {
+        // Resolve the selected category to its set of model IDs via brands.
+        // Marketplace products carry modelId (no categoryId), so we filter by
+        // modelId IN (models reachable from the category's mapped brands).
+        let allowedModelIds = null;
+        if (categoryId || categoryCode) {
+          const brands = await getBrandsForCategory(categoryId || categoryCode).catch(() => []);
+          const modelLists = await Promise.all(
+            (brands || []).map((b) => getModelsByBrand(b.id).catch(() => [])),
+          );
+          const ids = new Set();
+          modelLists.flat().forEach((m) => { if (m?.id) ids.add(m.id); });
+          allowedModelIds = ids;
+        }
+
+        const products = await listProducts({ status: 'ACTIVE' }).catch(() => []);
+        const filtered = allowedModelIds
+          ? (products || []).filter((p) => p.modelId && allowedModelIds.has(p.modelId))
+          : (products || []);
+        if (!cancelled) setItems(filtered);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     })();
-  }, []);
+    return () => { cancelled = true; };
+  }, [categoryId, categoryCode]);
+
   if (loading) return <Loader />;
-  if (!items.length) return <Empty text="No products yet" />;
+
   return (
     <ScrollView style={styles.container}>
-      {items.map((p) => (
+      {(categoryName || title) ? (
+        <View style={styles.categoryBar}>
+          <Text style={styles.categoryLabel}>Showing products in</Text>
+          <Text style={styles.categoryName}>{categoryName || title}</Text>
+        </View>
+      ) : null}
+
+      {!items.length ? (
+        <Empty text={categoryName ? `No ${categoryName.toLowerCase()} products yet` : 'No products yet'} />
+      ) : items.map((p) => (
         <TouchableOpacity key={p.id} style={styles.card} onPress={() => navigation.navigate('BuyProductDetails', { productId: p.id })}>
           <View style={styles.body}>
             <View style={styles.thumb} />

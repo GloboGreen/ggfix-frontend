@@ -17,7 +17,10 @@ export default function DeviceInformationScreen({ navigation, route }) {
   const services = params.services || [];
   const total = services.reduce((sum, s) => sum + (Number(s.price) || 0), 0);
 
-  const [photos, setPhotos] = useState({}); // { front: url, back: url, video: url }
+  const [photos, setPhotos] = useState(() => {
+    const p = params.prefillDevicePhotos;
+    return p && typeof p === 'object' ? { ...p } : {};
+  }); // { front: url, back: url, video: url }
   const [uploading, setUploading] = useState(null);
 
   const pick = async (slot) => {
@@ -97,7 +100,7 @@ export default function DeviceInformationScreen({ navigation, route }) {
         <Card className="mb-4">
           <Text className="text-text mb-1"><Text className="font-bold">Estimated Approximate Time :</Text> {params.estimatedAt}</Text>
           <Text className="text-text mb-1"><Text className="font-bold">Estimated Delivery Date :</Text> {params.estimatedDelivery}</Text>
-          <Text className="text-text"><Text className="font-bold">Customer Repair Approval :</Text> <Text className="text-success font-bold">Done</Text></Text>
+          <Text className="text-text"><Text className="font-bold">Customer Repair Approval :</Text> {params.customerApproved ? <Text className="text-success font-bold">Done</Text> : <Text className="text-warning font-bold">Pending</Text>}</Text>
         </Card>
 
         <Card>

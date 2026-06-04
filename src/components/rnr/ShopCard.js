@@ -14,8 +14,10 @@ const cardShadow = {
 
 // "0.2956…" -> "296 m"; "1.2345" -> "1.2 km". Returns null when not usable.
 function formatDistance(d) {
+  if (d === null || d === undefined || d === '') return null;
   const n = Number(d);
-  if (!isFinite(n) || n <= 0) return null;
+  if (!isFinite(n) || n < 0) return null;
+  if (n < 0.05) return '< 50 m';
   return n < 1 ? `${Math.round(n * 1000)} m` : `${n.toFixed(1)} km`;
 }
 

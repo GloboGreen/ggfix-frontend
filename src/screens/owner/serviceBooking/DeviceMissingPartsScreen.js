@@ -16,7 +16,16 @@ const PARTS = [
 export default function DeviceMissingPartsScreen({ navigation, route }) {
   const params = route?.params || {};
   // { [id]: { missing, damage, detail } }
-  const [state, setState] = useState({});
+  const [state, setState] = useState(() => {
+    const prefill = Array.isArray(params.prefillMissingParts) ? params.prefillMissingParts : [];
+    const seed = {};
+    for (const p of prefill) {
+      const key = p.partId || p.id;
+      if (!key) continue;
+      seed[key] = { missing: !!p.missing, damage: !!p.damage, detail: p.detail || '' };
+    }
+    return seed;
+  });
 
   const setField = (id, key, value) =>
     setState((p) => ({ ...p, [id]: { ...(p[id] || {}), [key]: value } }));

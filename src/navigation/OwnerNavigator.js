@@ -11,8 +11,10 @@ import MyAccountScreen from '../screens/owner/MyAccountScreen';
 import BookingHistoryScreen from '../screens/owner/AllBooking/BookingHistoryScreen';
 import BillingScreen from '../screens/owner/BillingScreen';
 import BuyScreen from '../screens/owner/BuyScreen';
+import OwnerBuyListingDetailsScreen from '../screens/owner/OwnerBuyListingDetailsScreen';
 import TicketListScreen from '../screens/owner/TicketListScreen';
 import TicketDetailScreen from '../screens/owner/AllBooking/TicketDetailScreen';
+import DeviceDetailScreen from '../screens/owner/AllBooking/DeviceDetailScreen';
 import EditBookingScreen from '../screens/owner/AllBooking/EditBookingScreen';
 import DeviceInformationScreen from '../screens/owner/DeviceInformationScreen';
 import DeviceMissingPartsScreen from '../screens/owner/DeviceMissingPartsScreen';
@@ -197,6 +199,7 @@ export default function OwnerNavigator({ session, onLogout }) {
       <Stack.Screen name="BookingStatus" component={BookingStatusScreen} options={{ headerShown: false }} />
       <Stack.Screen name="ShopServiceStatus" component={ShopServiceStatusScreen} options={{ headerShown: false }} />
       <Stack.Screen name="TicketDetail" component={TicketDetailScreen} options={{ title: 'Booking Details' }} />
+      <Stack.Screen name="DeviceDetail" component={DeviceDetailScreen} options={{ title: 'Device Details' }} />
       <Stack.Screen name="EditBooking" component={EditBookingScreen} options={{ title: 'Edit Booking' }} />
       <Stack.Screen name="LegacyDeviceInformation" component={DeviceInformationScreen} options={{ title: 'Device Information' }} />
       <Stack.Screen name="LegacyDeviceMissingParts" component={DeviceMissingPartsScreen} options={{ title: 'Device Missing Parts' }} />
@@ -207,6 +210,7 @@ export default function OwnerNavigator({ session, onLogout }) {
       <Stack.Screen name="DeliveryInvoice" component={DeliveryInvoiceScreen} options={{ title: 'Deliver Invoice' }} />
       <Stack.Screen name="LegacyAssignTechnician" component={AssignTechnicianScreen} options={{ title: 'Assign Technician' }} />
       <Stack.Screen name="MarketplaceSell" component={MarketplaceSellScreen} options={{ title: 'Sell' }} />
+      <Stack.Screen name="OwnerBuyListingDetails" component={OwnerBuyListingDetailsScreen} options={{ headerShown: false }} />
       <Stack.Screen name="OwnerSellMobile" component={OwnerSellMobileChoiceScreen} options={{ headerShown: false }} />
       <Stack.Screen name="OwnerSellSpareParts" component={OwnerSellSparePartsScreen} options={{ headerShown: false }} />
       <Stack.Screen name="OwnerSellChooseSalesCategory" component={OwnerSellChooseSalesCategoryScreen} options={{ headerShown: false }} />

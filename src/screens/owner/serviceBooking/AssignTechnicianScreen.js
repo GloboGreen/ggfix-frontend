@@ -9,7 +9,7 @@ import { notify } from '../../../components/confirm';
 
 export default function AssignTechnicianScreen({ navigation, route }) {
   const shopId = useSelector(selectShopId);
-  const { tickets = [], customer, devices } = route?.params || {};
+  const { tickets = [], customer, devices, returnToTicketId } = route?.params || {};
   const [techs, setTechs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(null);
@@ -29,6 +29,13 @@ export default function AssignTechnicianScreen({ navigation, route }) {
     try {
       for (const t of tickets) {
         await ticketApi.patch(`/tickets/${t.id}`, { body: { assignedTechnicianId: tech.id } });
+      }
+      // Re-assign flow from TicketDetail: pop back so the detail screen's
+      // focus listener refetches and shows the new technician.
+      if (returnToTicketId) {
+        notify('Technician assigned', `${tech.name || 'Technician'} has been assigned.`);
+        navigation.goBack();
+        return;
       }
       navigation.replace('BookingSuccessful', { tickets, customer, devices, assignedTech: tech });
     } catch (e) {

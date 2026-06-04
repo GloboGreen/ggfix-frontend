@@ -46,7 +46,55 @@ export default function CustomerDetailsScreen({ route, navigation }) {
 
   const [form, setForm] = useState(initial);
   const [saving, setSaving] = useState(false);
+  const [lookingUp, setLookingUp] = useState(false);
+  const [lookupHint, setLookupHint] = useState('');
+  const [matchedCustomer, setMatchedCustomer] = useState(
+    mode === 'existing' && customer ? customer : null,
+  );
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
+
+  const handleMobileLookup = async () => {
+    const digits = (form.phone || '').replace(/\D/g, '').replace(/^91/, '');
+    if (!digits) {
+      Alert.alert('Mobile required', 'Enter a mobile number to search');
+      return;
+    }
+    setLookingUp(true);
+    setLookupHint('');
+    try {
+      const found = await ticketApi.get('/customers/lookup', { query: { mobile: digits } });
+      if (!found || !found.id) {
+        setMatchedCustomer(null);
+        setLookupHint('No existing customer — fill the form to create new.');
+        return;
+      }
+      const cleanPhone = (found.phone || '').replace(/\D/g, '').replace(/^91/, '');
+      const addressParts = (found.address || '').split(',').map((s) => s.trim());
+      setForm((prev) => ({
+        ...prev,
+        name: found.name || prev.name,
+        phone: cleanPhone || prev.phone,
+        email: found.email || prev.email,
+        state: addressParts[0] || prev.state,
+        district: addressParts[1] || prev.district,
+        taluk: addressParts[2] || prev.taluk,
+        area: addressParts[3] || prev.area,
+        doorStreet: addressParts[4] || prev.doorStreet,
+        pincode: addressParts[5] || prev.pincode,
+      }));
+      setMatchedCustomer(found);
+      setLookupHint(
+        found.source === 'platform'
+          ? 'Found platform customer — will be linked to your shop on booking.'
+          : 'Existing shop customer loaded.',
+      );
+    } catch (e) {
+      setMatchedCustomer(null);
+      setLookupHint(e?.message || 'Lookup failed');
+    } finally {
+      setLookingUp(false);
+    }
+  };
 
   const buildAddress = () => {
     const parts = [form.state, form.district, form.taluk, form.area, form.doorStreet, form.pincode].filter(Boolean);
@@ -64,6 +112,45 @@ export default function CustomerDetailsScreen({ route, navigation }) {
     }
     const phone = form.phone.replace(/\D/g, '').trim();
     const displayPhone = phone.startsWith('91') ? `+${phone}` : `+91 ${phone}`;
+
+    // If lookup matched a platform customer, link it to this shop instead of
+    // creating a fresh customers row — keeps shop & platform customers in sync.
+    if (matchedCustomer && matchedCustomer.source === 'platform' && matchedCustomer.platformUserId) {
+      setSaving(true);
+      try {
+        const linked = await ticketApi.post('/customers/link', {
+          body: { platformUserId: matchedCustomer.platformUserId },
+        });
+        navigation.navigate('ChooseDevice', {
+          customer: {
+            id: linked.id,
+            name: linked.name,
+            phone: linked.phone,
+            email: linked.email,
+            address: linked.address,
+          },
+        });
+      } catch (e) {
+        Alert.alert('Error', e.message || 'Failed to link customer');
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
+    // Existing shop customer (already has shop-scoped id) — just go forward.
+    if (matchedCustomer && matchedCustomer.id && matchedCustomer.source !== 'platform') {
+      navigation.navigate('ChooseDevice', {
+        customer: {
+          id: matchedCustomer.id,
+          name: form.name.trim(),
+          phone: displayPhone,
+          email: form.email?.trim(),
+          address: buildAddress(),
+        },
+      });
+      return;
+    }
 
     if (mode === 'new') {
       setSaving(true);
@@ -140,9 +227,27 @@ export default function CustomerDetailsScreen({ route, navigation }) {
             placeholderTextColor="#9CA3AF"
             keyboardType="phone-pad"
             value={form.phone}
-            onChangeText={(v) => set('phone', v)}
+            onChangeText={(v) => {
+              set('phone', v);
+              if (lookupHint) setLookupHint('');
+              if (matchedCustomer) setMatchedCustomer(null);
+            }}
+            onSubmitEditing={handleMobileLookup}
+            returnKeyType="search"
           />
+          <TouchableOpacity
+            onPress={handleMobileLookup}
+            disabled={lookingUp}
+            style={[styles.lookupBtn, lookingUp && { opacity: 0.6 }]}
+          >
+            {lookingUp ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Ionicons name="search" size={16} color="#FFFFFF" />
+            )}
+          </TouchableOpacity>
         </View>
+        {lookupHint ? <Text style={styles.lookupHint}>{lookupHint}</Text> : null}
 
         <Label label="Address" />
         <View style={styles.grid2}>
@@ -295,6 +400,15 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   countryText: { fontSize: 13, color: '#111827', marginRight: 6 },
+  lookupBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: '#3B4FD7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lookupHint: { fontSize: 11, color: '#2563EB', marginTop: -4, marginBottom: 10 },
   grid2: { flexDirection: 'row', gap: 10 },
   uploadBox: {
     backgroundColor: '#FFFFFF',

@@ -9,6 +9,7 @@ import {
   Tag,
   ShieldCheck,
   Skull,
+  Pencil,
 } from 'lucide-react-native';
 
 const sellConditionsFor = (deviceLabel) => [
@@ -77,11 +78,19 @@ export default function SelectVariantScreen({ navigation, route }) {
   const [storages, setStorages] = useState([]);
   const [colorsList, setColorsList] = useState([]);
 
+  const editHints = route?.params?.editHints || null;
+  const editSellOrderId = route?.params?.editSellOrderId || null;
+  const isEditingSellOrder = !!editSellOrderId;
+
   const [ram, setRam] = useState(route?.params?.ramOptionId ? { id: route.params.ramOptionId, label: '' } : null);
   const [storage, setStorage] = useState(route?.params?.storageOptionId ? { id: route.params.storageOptionId, label: '' } : null);
   const [color, setColor] = useState(route?.params?.color ? { id: route.params.color, name: route.params.color } : null);
   const [imei, setImei] = useState(route?.params?.imei || '');
-  const [condition, setCondition] = useState('WORKING'); // sell flow: phone condition
+  // When editing a sell order, restore the original working condition; for a
+  // brand-new sell we default to WORKING.
+  const [condition, setCondition] = useState(
+    (isEditingSellOrder && editHints?.workingCondition === 'DEAD') ? 'DEAD' : 'WORKING',
+  );
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -172,7 +181,12 @@ export default function SelectVariantScreen({ navigation, route }) {
       return;
     }
     if (flow === 'SELL') {
-      navigation.navigate('SellScreening', { device: { ...payload, modelName, imei }, workingCondition: condition });
+      navigation.navigate('SellScreening', {
+        device: { ...payload, modelName, imei },
+        workingCondition: condition,
+        editSellOrderId: route?.params?.editSellOrderId,
+        editHints: route?.params?.editHints,
+      });
       return;
     }
     if (flow === 'OWNER_LIST') {
@@ -198,6 +212,18 @@ export default function SelectVariantScreen({ navigation, route }) {
   return (
     <View className="flex-1 bg-background">
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 140 }}>
+
+        {isEditingSellOrder ? (
+          <View className="bg-warning/10 border border-warning/30 rounded-xl px-3 py-2 mb-3 flex-row items-center">
+            <Pencil size={13} color="#F59E0B" />
+            <View className="flex-1 ml-2">
+              <Text className="text-[10px] font-extrabold text-warning tracking-wider">EDITING ORDER</Text>
+              <Text className="text-[12px] text-text font-semibold" numberOfLines={1}>
+                We've kept your existing color, storage and IMEI — change any of them below.
+              </Text>
+            </View>
+          </View>
+        ) : null}
 
         {/* Device summary */}
         <View className="bg-card border border-border rounded-2xl p-3 mb-3 flex-row items-center"

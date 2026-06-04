@@ -15,9 +15,7 @@ import {
   ChevronRight,
   Pencil,
   ShieldCheck,
-  Wallet,
   Bell,
-  Star,
 } from 'lucide-react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { clearSession as clearAuth, selectSession } from '../../../store/authSlice';
@@ -111,40 +109,6 @@ export default function ProfileScreen({ navigation }) {
       </SafeAreaView>
 
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
-        {/* Stats strip — sits cleanly below the header, no overflow clipping */}
-        <View className="mt-3 mx-4 bg-card border border-border rounded-2xl flex-row p-2.5"
-              style={{ shadowColor: '#0F172A', shadowOpacity: 0.08, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 4 }}>
-          <Pressable onPress={() => navigation.navigate('MyOrders')} className="flex-1 flex-row items-center justify-center px-1 py-1 active:opacity-70">
-            <View className="h-8 w-8 rounded-full bg-primary/10 items-center justify-center mr-2">
-              <ShoppingBag size={14} color="#00008B" />
-            </View>
-            <View>
-              <Text className="text-[9px] text-text-muted leading-3">Orders</Text>
-              <Text className="text-[13px] font-extrabold text-text leading-4">12</Text>
-            </View>
-          </Pressable>
-          <View className="w-px bg-border my-1" />
-          <Pressable className="flex-1 flex-row items-center justify-center px-1 py-1 active:opacity-70">
-            <View className="h-8 w-8 rounded-full bg-success/10 items-center justify-center mr-2">
-              <Wallet size={14} color="#10B981" />
-            </View>
-            <View>
-              <Text className="text-[9px] text-text-muted leading-3">Wallet</Text>
-              <Text className="text-[13px] font-extrabold text-text leading-4">₹200</Text>
-            </View>
-          </Pressable>
-          <View className="w-px bg-border my-1" />
-          <Pressable className="flex-1 flex-row items-center justify-center px-1 py-1 active:opacity-70">
-            <View className="h-8 w-8 rounded-full bg-warning/10 items-center justify-center mr-2">
-              <Star size={14} color="#F59E0B" />
-            </View>
-            <View>
-              <Text className="text-[9px] text-text-muted leading-3">Rewards</Text>
-              <Text className="text-[13px] font-extrabold text-text leading-4">Gold</Text>
-            </View>
-          </Pressable>
-        </View>
-
         {/* Account */}
         <Text className="text-[10px] font-extrabold text-text-muted px-5 mt-4 mb-1.5 tracking-widest">ACCOUNT</Text>
         <View className="mx-4 bg-card border border-border rounded-2xl overflow-hidden">

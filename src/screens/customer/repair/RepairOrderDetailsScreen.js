@@ -3,15 +3,8 @@ import { Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   ChevronLeft,
-  CheckCircle2,
   CalendarClock,
   Smartphone,
-  Wrench,
-  Clock,
-  Truck,
-  PackageCheck,
-  PackageOpen,
-  AlertTriangle,
   MapPin,
   Store,
   Phone,
@@ -25,10 +18,8 @@ import {
   Loader,
   Badge,
   EmptyState,
-  Button,
 } from '../../../components/rnr';
-import { confirm, notify } from '../../../components/confirm';
-import { getRepairBooking, cancelRepairBooking } from '../../../api/orders';
+import { getRepairBooking } from '../../../api/orders';
 import { getBrands, getModelsByBrand, getRamOptions, getStorageOptions } from '../../../api/masterData';
 import { getShop } from '../../../api/shops';
 import { listAddresses } from '../../../api/customer';
@@ -51,20 +42,10 @@ function DetailLine({ label, value, valueClass }) {
   );
 }
 
-const STEPS = [
-  { key: 'ORDER_PLACED',            label: 'Order Placed',            icon: CheckCircle2 },
-  { key: 'ORDER_SERVICE_CONFIRMED', label: 'Service Confirmed',       icon: Wrench },
-  { key: 'PICK_UP_ASSIGNED',        label: 'Pickup Assigned',         icon: Truck },
-  { key: 'IN_REPAIR',               label: 'In Repair',               icon: Clock },
-  { key: 'OUT_FOR_DELIVERY',        label: 'Out for Delivery',        icon: PackageCheck },
-  { key: 'DELIVERED',               label: 'Delivered',               icon: PackageOpen },
-];
-
 export default function RepairOrderDetailsScreen({ navigation, route }) {
   const { bookingId, fromOrders } = route.params || {};
   const [b, setB] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [cancelling, setCancelling] = useState(false);
   // Device details resolved from the booking's IDs (the booking record doesn't
   // store the model name/specs).
   const [dev, setDev] = useState({});
@@ -167,31 +148,7 @@ export default function RepairOrderDetailsScreen({ navigation, route }) {
     );
   }
 
-  const currentStepIdx = STEPS.findIndex((s) => s.key === b.status);
-  const safeIdx = currentStepIdx === -1 ? 0 : currentStepIdx;
-
-  const onCancel = async () => {
-    const ok = await confirm({
-      title: 'Cancel pickup',
-      message: 'Are you sure you want to cancel this booking?',
-      confirmText: 'Yes, cancel',
-      cancelText: 'Keep it',
-      destructive: true,
-    });
-    if (!ok) return;
-    setCancelling(true);
-    try {
-      await cancelRepairBooking(bookingId);
-      notify('Cancelled', 'Your pickup has been cancelled.');
-      goHome();
-    } catch (e) {
-      notify('Error', e?.message || 'Could not cancel');
-    } finally {
-      setCancelling(false);
-    }
-  };
-
-  const canCancel = ['ORDER_PLACED', 'ORDER_SERVICE_CONFIRMED'].includes(b.status);
+  const approvalDone = (b.customerApproval || '').toUpperCase() === 'DONE';
   const serviceNames = (b.services || []).map((s) => s.serviceName).join(', ');
   const priceTotal = b.estimateAmount != null
     ? Number(b.estimateAmount)
@@ -208,7 +165,7 @@ export default function RepairOrderDetailsScreen({ navigation, route }) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: canCancel ? 120 : 24 }}>
+      <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 24 }}>
        <View style={centered}>
         {/* Arriving banner (pickup bookings only) */}
         {b.pickupDate ? (
@@ -318,7 +275,11 @@ export default function RepairOrderDetailsScreen({ navigation, route }) {
           <DetailLine label="Complaint Issue" value={b.issueSummary} />
           <DetailLine label="Estimated Approximate Time" value={estTimeText} />
           <DetailLine label="Estimated Delivery Date" value={fmtDateTime(b.estimatedDeliveryAt)} />
-          <DetailLine label="Customer Repair Approval" value={approvalText} valueClass="text-success" />
+          <DetailLine
+            label="Customer Repair Approval"
+            value={approvalText}
+            valueClass={approvalDone ? 'text-success' : 'text-warning'}
+          />
         </Card>
 
         {/* Device Security */}
@@ -327,7 +288,12 @@ export default function RepairOrderDetailsScreen({ navigation, route }) {
             <ShieldCheck size={15} color="#10B981" />
             <CardTitle className="ml-2">Device Security</CardTitle>
           </View>
-          <DetailLine label="PIN / Pattern" value={b.devicePin} />
+          <DetailLine
+            label="PIN / Pattern"
+            value={b.devicePin
+              ? (b.deviceSecurityType ? `${b.deviceSecurityType} - ${b.devicePin}` : b.devicePin)
+              : null}
+          />
           <View className="h-px bg-border my-2" />
           <Text className="text-[12px] font-extrabold text-text mb-0.5">Device Missing / Damage Parts</Text>
           <Text className="text-[12px] text-text-muted">{b.missingDamageParts || 'Nil'}</Text>
@@ -404,73 +370,8 @@ export default function RepairOrderDetailsScreen({ navigation, route }) {
           </Card>
         ) : null}
 
-        {/* Status timeline */}
-        <Card className="rounded-2xl mb-3">
-          <View className="flex-row items-center justify-between mb-2">
-            <CardTitle>Order Status</CardTitle>
-            <Pressable
-              onPress={() => navigation.navigate(
-                (b.serviceMode === 'PICKUP' || b.pickupDate || b.pickupSlotStart) ? 'RepairPickupStatus' : 'RepairOrderHistory',
-                { bookingId },
-              )}
-              className="flex-row items-center active:opacity-70"
-            >
-              <Text className="text-[11px] font-bold text-primary mr-0.5">Full timeline</Text>
-            </Pressable>
-          </View>
-          {STEPS.map((step, i) => {
-            const reached = i <= safeIdx;
-            const Icon = step.icon;
-            return (
-              <View key={step.key} className="flex-row items-center py-1.5">
-                <View
-                  className={`h-7 w-7 rounded-full items-center justify-center mr-2.5 ${reached ? 'bg-success' : 'bg-background border border-border'}`}
-                >
-                  <Icon size={13} color={reached ? '#fff' : '#94A3B8'} />
-                </View>
-                <Text
-                  className={`text-[12px] flex-1 ${reached ? 'font-extrabold text-text' : 'text-text-muted'}`}
-                >
-                  {step.label}
-                </Text>
-                {i === safeIdx ? (
-                  <Badge variant="softSuccess">CURRENT</Badge>
-                ) : reached ? (
-                  <CheckCircle2 size={14} color="#10B981" />
-                ) : null}
-              </View>
-            );
-          })}
-        </Card>
-
-        {/* Help banner if not cancellable */}
-        {!canCancel ? (
-          <View className="bg-primary/5 border border-primary/10 rounded-xl p-2.5 flex-row items-start">
-            <AlertTriangle size={12} color="#00008B" style={{ marginTop: 2 }} />
-            <Text className="text-[11px] text-text-muted ml-2 flex-1 leading-4">
-              This booking can't be cancelled at this stage. Contact the shop directly from the chat for any changes.
-            </Text>
-          </View>
-        ) : null}
        </View>
       </ScrollView>
-
-      {/* Sticky cancel CTA - only when status allows it */}
-      {canCancel ? (
-        <View className="absolute left-0 right-0 bottom-0 bg-card border-t border-border px-3 pt-2.5 pb-5"
-              style={{ shadowColor: '#0F172A', shadowOpacity: 0.08, shadowRadius: 12, shadowOffset: { width: 0, height: -4 }, elevation: 12 }}>
-          <View style={centered}>
-            <Button
-              variant="destructive"
-              onPress={onCancel}
-              loading={cancelling}
-              fullWidth
-            >
-              Cancel Pickup Request
-            </Button>
-          </View>
-        </View>
-      ) : null}
     </View>
   );
 }

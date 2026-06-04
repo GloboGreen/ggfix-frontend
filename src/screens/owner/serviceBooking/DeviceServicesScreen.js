@@ -35,8 +35,22 @@ export default function DeviceServicesScreen({ navigation, route }) {
 
   // Per-service input state, regardless of picked status — so the price the user
   // typed is what +Add commits, and persists if they Remove and re-Add.
-  const [rows, setRows] = useState({}); // { [serviceId]: { price, warranty } }
-  const [pickedIds, setPickedIds] = useState(() => new Set());
+  // When entering from "Edit Booking", prefillServices seeds the rows + picks so
+  // existing line items show as already added with their saved price/warranty.
+  const seedFromPrefill = () => {
+    const prefill = Array.isArray(params.prefillServices) ? params.prefillServices : [];
+    const rowSeed = {};
+    const idSeed = new Set();
+    for (const s of prefill) {
+      if (!s?.serviceId) continue;
+      rowSeed[s.serviceId] = { price: String(s.price ?? ''), warranty: s.warranty || '' };
+      idSeed.add(s.serviceId);
+    }
+    return { rowSeed, idSeed };
+  };
+  const seed = useMemo(seedFromPrefill, []);
+  const [rows, setRows] = useState(seed.rowSeed); // { [serviceId]: { price, warranty } }
+  const [pickedIds, setPickedIds] = useState(() => new Set(seed.idSeed));
   const [expanded, setExpanded] = useState({}); // { [groupId]: bool }
 
   useEffect(() => {
@@ -65,6 +79,23 @@ export default function DeviceServicesScreen({ navigation, route }) {
     });
     return Array.from(byCat.values());
   }, [services, mainCats]);
+
+  // When entering from Edit Booking, auto-expand the groups that already have
+  // prefilled picks so the user can see/modify them without hunting for them.
+  useEffect(() => {
+    if (pickedIds.size === 0 || groups.length === 0) return;
+    setExpanded((prev) => {
+      const next = { ...prev };
+      let touched = false;
+      for (const g of groups) {
+        if (next[g.id]) continue;
+        if (g.services.some((s) => pickedIds.has(s.id))) { next[g.id] = true; touched = true; }
+      }
+      return touched ? next : prev;
+    });
+    // We only want this to run once groups become available.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groups]);
 
   const ensureRow = (id) => rows[id] || { price: '', warranty: '' };
   const setField = (id, key, value) => {

@@ -44,9 +44,11 @@ export default function DeviceColorStorageScreen({ navigation, route }) {
   const [rams, setRams] = useState([]);
   const [storages, setStorages] = useState([]);
   const [colorsList, setColorsList] = useState([]);
-  const [color, setColor] = useState('');
-  const [ram, setRam] = useState(null);
-  const [storage, setStorage] = useState(null);
+  // Edit mode: hydrate color/RAM/storage from the existing ticket so they show
+  // pre-selected. Picking a different option just overwrites the choice.
+  const [color, setColor] = useState(params.color || '');
+  const [ram, setRam] = useState(params.ramOptionId || null);
+  const [storage, setStorage] = useState(params.storageOptionId || null);
 
   useEffect(() => {
     (async () => {

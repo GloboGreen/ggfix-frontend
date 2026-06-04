@@ -38,8 +38,8 @@ export default function BookingSummaryScreen({ route, navigation }) {
     : 'Display, Battery, Motherboard';
   const displayTrackingId = trackingId || 'CSPEN08867133';
   const displayPrice = estimatedPrice != null
-    ? `â‚¹${Number(estimatedPrice).toLocaleString('en-IN')}`
-    : 'â‚¹12,500.00';
+    ? `₹${Number(estimatedPrice).toLocaleString('en-IN')}`
+    : '₹12,500.00';
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>

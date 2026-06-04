@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,6 +15,9 @@ const styles = StyleSheet.create({
   slotLabel: { fontSize: 13, fontWeight: '700', color: colors.text, marginTop: 6, textAlign: 'center' },
   slotLabelOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(255,255,255,0.92)', paddingVertical: 4, fontSize: 12, fontWeight: '700', color: colors.text, textAlign: 'center' },
   removeBtn: { position: 'absolute', right: 4, top: 4, height: 22, width: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },
+  editBanner: { backgroundColor: '#FEF3C7', borderColor: '#FCD34D', borderWidth: 1, borderRadius: 10, padding: 10, marginBottom: 4, flexDirection: 'row', alignItems: 'center' },
+  editBannerTitle: { fontSize: 10, fontWeight: '800', color: '#92400E', letterSpacing: 0.5 },
+  editBannerText: { fontSize: 12, color: colors.text, fontWeight: '600', marginTop: 2 },
   bottom: { padding: 12, backgroundColor: '#fff', borderTopColor: colors.border, borderTopWidth: 1 },
 });
 
@@ -29,8 +32,23 @@ const SLOTS = [
 
 export default function SellImagesScreen({ navigation, route }) {
   const params = route.params || {};
-  const [condition, setCondition] = useState('Good');
-  const [images, setImages] = useState({}); // key -> url
+  const { editSellOrderId, editHints } = params;
+  const isEditing = !!editSellOrderId;
+
+  // Seed photo slots from the order's saved image URLs when editing.
+  const initialImages = useMemo(() => {
+    if (!isEditing) return {};
+    const out = {};
+    const src = editHints?.images || {};
+    SLOTS.forEach((s) => { if (src[s.key]) out[s.key] = src[s.key]; });
+    return out;
+  }, [isEditing, editHints]);
+  const initialCondition = isEditing
+    ? (editHints?.deviceConditionSummary || 'Good')
+    : 'Good';
+
+  const [condition, setCondition] = useState(initialCondition);
+  const [images, setImages] = useState(initialImages); // key -> url
   const [uploading, setUploading] = useState(null); // key currently uploading
 
   const pick = async (key) => {
@@ -82,6 +100,15 @@ export default function SellImagesScreen({ navigation, route }) {
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={{ padding: 12 }}>
+        {isEditing ? (
+          <View style={styles.editBanner}>
+            <Ionicons name="create-outline" size={16} color="#92400E" />
+            <View style={{ flex: 1, marginLeft: 8 }}>
+              <Text style={styles.editBannerTitle}>EDITING ORDER</Text>
+              <Text style={styles.editBannerText}>Your previously uploaded photos are kept — tap to replace any.</Text>
+            </View>
+          </View>
+        ) : null}
         <Card style={{ padding: 10, marginVertical: 4 }}>
           <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text, marginBottom: 4, textAlign: 'center' }}>Upload for Device Images</Text>
           <Text style={{ fontSize: 11, color: colors.textSecondary, marginBottom: 8, textAlign: 'center' }}>Maximum file size: 5 MB.</Text>

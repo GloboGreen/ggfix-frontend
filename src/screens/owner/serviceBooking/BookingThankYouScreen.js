@@ -78,7 +78,11 @@ export default function BookingThankYouScreen({ navigation, route }) {
             icon="qr-code-outline"
             color="#A855F7"
             label="Barcode Print"
-            onPress={() => navigation.navigate('ScanQrCode')}
+            onPress={() => {
+              const tid = tickets[0]?.id;
+              if (tid) navigation.navigate('BarcodePrint', { ticketId: tid });
+              else navigation.navigate('ScanQrCode');
+            }}
           />
         </View>
       </ScrollView>
