@@ -14,14 +14,20 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { ticketApi } from '../../api/client';
+import { assignPickupPerson } from '../../api/orders';
 
 const PLACEHOLDER_AVATAR = 'https://dummyassets.local/avatars/customer-1.png';
+const PICKUP_ROLE = 'Pickup Person';
 
-export default function OwnerEmployeeListScreen({ navigation }) {
+export default function OwnerEmployeeListScreen({ navigation, route }) {
+  const assignFor = route?.params?.assignFor || null;
+  const bookingId = route?.params?.bookingId || null;
+  const isPickupPicker = assignFor === 'pickup' && !!bookingId;
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [toggling, setToggling] = useState(null);
+  const [assigning, setAssigning] = useState(null);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -63,6 +69,29 @@ export default function OwnerEmployeeListScreen({ navigation }) {
     navigation.navigate('OwnerEmployeeAdd');
   };
 
+  const handlePickPickupPerson = async (tech) => {
+    if (!isPickupPicker || assigning) return;
+    setAssigning(tech.id);
+    try {
+      await assignPickupPerson(bookingId, {
+        pickupPersonId: tech.id,
+        pickupPersonName: tech.name || null,
+        pickupPersonPhone: tech.phone || null,
+      });
+      navigation.goBack();
+    } catch (e) {
+      Alert.alert('Could not assign', e?.body?.message || e?.message || 'Please try again.');
+    } finally {
+      setAssigning(null);
+    }
+  };
+
+  // When opened as a pickup-person picker, hide everyone except staff with the
+  // Pickup Person role so the owner can't mis-assign a technician.
+  const visibleList = isPickupPicker
+    ? list.filter((e) => (e.roleLabel || '').toLowerCase() === PICKUP_ROLE.toLowerCase())
+    : list;
+
   if (loading && list.length === 0) {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
@@ -76,12 +105,16 @@ export default function OwnerEmployeeListScreen({ navigation }) {
       <View style={styles.headerRow}>
         <View style={styles.sectionTitleRow}>
           <Ionicons name="people" size={20} color="#111827" />
-          <Text style={styles.sectionTitle}>All Employees</Text>
+          <Text style={styles.sectionTitle}>
+            {isPickupPicker ? 'Select Pickup Person' : 'All Employees'}
+          </Text>
         </View>
-        <TouchableOpacity style={styles.addStaffBtn} onPress={goAddStaff}>
-          <Ionicons name="person-add" size={18} color="#FFFFFF" />
-          <Text style={styles.addStaffText}>Add Staff</Text>
-        </TouchableOpacity>
+        {isPickupPicker ? null : (
+          <TouchableOpacity style={styles.addStaffBtn} onPress={goAddStaff}>
+            <Ionicons name="person-add" size={18} color="#FFFFFF" />
+            <Text style={styles.addStaffText}>Add Staff</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <ScrollView
@@ -91,12 +124,17 @@ export default function OwnerEmployeeListScreen({ navigation }) {
           <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} />
         }
       >
-        {list.map((e) => (
+        {visibleList.map((e) => (
           <View key={e.id} style={styles.card}>
             <TouchableOpacity
               style={styles.cardMain}
-              onPress={() => navigation.navigate('OwnerEmployeeDetail', { employee: e })}
+              onPress={() =>
+                isPickupPicker
+                  ? handlePickPickupPerson(e)
+                  : navigation.navigate('OwnerEmployeeDetail', { employee: e })
+              }
               activeOpacity={0.7}
+              disabled={isPickupPicker && (assigning !== null || e.isAvailable === false)}
             >
               <View style={styles.avatarWrap}>
                 <View style={styles.avatar} />
@@ -106,35 +144,49 @@ export default function OwnerEmployeeListScreen({ navigation }) {
                 <Text style={styles.phone}>{e.phone || e.email || '—'}</Text>
                 <Text style={styles.role}>{e.roleLabel || 'Technician'}</Text>
               </View>
-              <View style={styles.rightRow}>
-                <View style={styles.statusRow}>
-                  <View style={[styles.statusDot, e.isAvailable !== false && styles.statusDotActive]} />
-                  <Text style={[styles.statusText, e.isAvailable !== false && styles.statusTextActive]}>
-                    {e.isAvailable !== false ? 'Active' : 'Inactive'}
-                  </Text>
+              {isPickupPicker ? (
+                <View style={styles.rightRow}>
+                  {assigning === e.id ? (
+                    <ActivityIndicator size="small" color="#3B4FD7" />
+                  ) : (
+                    <Ionicons name="chevron-forward" size={20} color="#3B4FD7" />
+                  )}
                 </View>
-                {toggling === e.id ? (
-                  <ActivityIndicator size="small" color="#22C55E" />
-                ) : (
-                  <Switch
-                    value={e.isAvailable !== false}
-                    onValueChange={(v) => onToggleActive(e, v)}
-                    trackColor={{ false: '#D1D5DB', true: '#86EFAC' }}
-                    thumbColor={e.isAvailable !== false ? '#22C55E' : '#9CA3AF'}
-                  />
-                )}
-                <TouchableOpacity
-                  style={styles.editBtn}
-                  onPress={() => navigation.navigate('OwnerEmployeeDetail', { employee: e })}
-                >
-                  <Ionicons name="open-outline" size={18} color="#6B7280" />
-                </TouchableOpacity>
-              </View>
+              ) : (
+                <View style={styles.rightRow}>
+                  <View style={styles.statusRow}>
+                    <View style={[styles.statusDot, e.isAvailable !== false && styles.statusDotActive]} />
+                    <Text style={[styles.statusText, e.isAvailable !== false && styles.statusTextActive]}>
+                      {e.isAvailable !== false ? 'Active' : 'Inactive'}
+                    </Text>
+                  </View>
+                  {toggling === e.id ? (
+                    <ActivityIndicator size="small" color="#22C55E" />
+                  ) : (
+                    <Switch
+                      value={e.isAvailable !== false}
+                      onValueChange={(v) => onToggleActive(e, v)}
+                      trackColor={{ false: '#D1D5DB', true: '#86EFAC' }}
+                      thumbColor={e.isAvailable !== false ? '#22C55E' : '#9CA3AF'}
+                    />
+                  )}
+                  <TouchableOpacity
+                    style={styles.editBtn}
+                    onPress={() => navigation.navigate('OwnerEmployeeDetail', { employee: e })}
+                  >
+                    <Ionicons name="open-outline" size={18} color="#6B7280" />
+                  </TouchableOpacity>
+                </View>
+              )}
             </TouchableOpacity>
           </View>
         ))}
-        {list.length === 0 && (
-          <Text style={styles.empty}>No employees. Tap Add Staff to add.</Text>
+        {visibleList.length === 0 && (
+          <Text style={styles.empty}>
+            {isPickupPicker
+              ? 'No pickup persons yet. Add staff with the "Pickup Person" role first.'
+              : 'No employees. Tap Add Staff to add.'}
+          </Text>
         )}
       </ScrollView>
     </SafeAreaView>

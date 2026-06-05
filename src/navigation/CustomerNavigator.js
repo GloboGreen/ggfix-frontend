@@ -46,6 +46,7 @@ import RepairPickupSlotScreen from '../screens/customer/repair/RepairPickupSlotS
 import RepairCompleteOrderScreen from '../screens/customer/repair/RepairCompleteOrderScreen';
 import RepairConfirmationScreen from '../screens/customer/repair/RepairConfirmationScreen';
 import RepairOrderDetailsScreen from '../screens/customer/repair/RepairOrderDetailsScreen';
+import ServiceTicketDetailsScreen from '../screens/customer/repair/ServiceTicketDetailsScreen';
 import RepairOrderHistoryScreen from '../screens/customer/repair/RepairOrderHistoryScreen';
 import RepairPickupStatusScreen from '../screens/customer/repair/RepairPickupStatusScreen';
 import ServiceReceiptScreen from '../screens/customer/repair/ServiceReceiptScreen';
@@ -197,6 +198,7 @@ export default function CustomerNavigator({ session, onLogout }) {
       <Stack.Screen name="RepairCompleteOrder" component={RepairCompleteOrderScreen} options={{ title: 'Complete Order' }} />
       <Stack.Screen name="RepairConfirmation" component={RepairConfirmationScreen} options={{ headerShown: false }} />
       <Stack.Screen name="RepairOrderDetails" component={RepairOrderDetailsScreen} options={{ title: 'View Details' }} />
+      <Stack.Screen name="ServiceTicketDetails" component={ServiceTicketDetailsScreen} options={{ title: 'View Details' }} />
       <Stack.Screen name="RepairOrderHistory" component={RepairOrderHistoryScreen} options={{ title: 'Service History' }} />
       <Stack.Screen name="RepairPickupStatus" component={RepairPickupStatusScreen} options={{ title: 'Pickup Status' }} />
       <Stack.Screen name="ServiceReceipt" component={ServiceReceiptScreen} options={{ title: 'Receipt' }} />

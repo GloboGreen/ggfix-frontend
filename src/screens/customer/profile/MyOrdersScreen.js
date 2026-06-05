@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import {
@@ -24,10 +24,11 @@ const TABS = [
   { key: 'Service', label: 'Service', icon: Wrench,        color: '#F59E0B', bg: 'bg-warning/10' },
 ];
 // Backend stores repair bookings split by service mode: doorstep-pickup → PICKUP,
-// enquiry → ENQUIRY, walk-in → REPAIR. The Service tab shows walk-in + pickup
-// (so a doorstep-pickup booking appears under both the Service and Pickup tabs).
+// enquiry → ENQUIRY, walk-in → REPAIR. Service tab shows every repair regardless
+// of delivery mode (walk-in + doorstep pickup), since a pickup booking is still
+// a service booking — the customer just chose pickup as the delivery channel.
+// A pickup booking therefore appears in both the Pickup and Service tabs.
 const TAB_MAP = { Buy: 'BUY', Sell: 'SELL', Pickup: 'PICKUP', Enquiry: 'ENQUIRY', Service: 'REPAIR' };
-// orderTypes a tab pulls; Service merges walk-in + pickup repairs.
 const TAB_ORDER_TYPES = { Service: ['REPAIR', 'PICKUP'] };
 const REPAIR_TABS = new Set(['Pickup', 'Enquiry', 'Service']);
 const STATUS_FILTERS = ['Pending', 'Completed', 'Cancelled'];
@@ -46,10 +47,21 @@ export default function MyOrdersScreen({ navigation }) {
   const [status, setStatus] = useState('Pending');
   const [items, setItems] = useState([]);
   const [details, setDetails] = useState({}); // orderId -> { name, image, specs, services, isPickup }
+  // Persistent per-booking enrichment cache. Keyed by booking ref (bookingId)
+  // so two customer_orders rows pointing at the same booking share one fetch
+  // and re-runs of the enrichment effect (tab switch, focus, items array
+  // reference change) skip already-resolved bookings — avoids the repeated
+  // 4xx storm we saw in the network tab when the per-booking GET was failing.
+  const enrichedCache = useRef(new Map()); // ref/key -> enriched record
+  const masterCache = useRef(null); // { brandById, ramById, storageById }
+  const modelsByBrand = useRef(new Map());
+  const shopCache = useRef(new Map());
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const types = TAB_ORDER_TYPES[tab] || [TAB_MAP[tab]];
       const lists = await Promise.all(types.map((t) => listMyOrders({ orderType: t, status })));
@@ -60,78 +72,129 @@ export default function MyOrdersScreen({ navigation }) {
         (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0),
       );
       setItems(merged);
+    } catch (e) {
+      // Surface fetch failures instead of silently showing the empty state —
+      // otherwise a 401/CORS/500 looks identical to "you have no orders".
+      setItems([]);
+      setError(e?.message || 'Failed to load orders');
     } finally { setLoading(false); }
   }, [tab, status]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   // Enrich orders with device name/image/specs resolved from the booking/sell
-  // order + master data (the order payload doesn't carry these).
+  // order + master data. Cached by ref so re-runs (focus, tab switch, items
+  // reference change) reuse prior fetches instead of hammering the API.
   useEffect(() => {
     if (!items.length || !(REPAIR_TABS.has(tab) || tab === 'Sell')) { setDetails({}); return undefined; }
     let cancelled = false;
     (async () => {
-      const [brands, rams, storages] = await Promise.all([
-        getBrands().catch(() => []),
-        getRamOptions().catch(() => []),
-        getStorageOptions().catch(() => []),
-      ]);
-      const brandById = {}; (brands || []).forEach((b) => { brandById[b.id] = b; });
-      const ramById = {}; (rams || []).forEach((r) => { ramById[r.id] = r; });
-      const storageById = {}; (storages || []).forEach((s) => { storageById[s.id] = s; });
-      const modelsCache = {};
-      const shopCache = {};
-      const result = {};
+      // Master data: brands / ram / storage. Fetched once per session.
+      if (!masterCache.current) {
+        const [brands, rams, storages] = await Promise.all([
+          getBrands().catch(() => []),
+          getRamOptions().catch(() => []),
+          getStorageOptions().catch(() => []),
+        ]);
+        const brandById = {}; (brands || []).forEach((b) => { brandById[b.id] = b; });
+        const ramById = {}; (rams || []).forEach((r) => { ramById[r.id] = r; });
+        const storageById = {}; (storages || []).forEach((s) => { storageById[s.id] = s; });
+        masterCache.current = { brandById, ramById, storageById };
+      }
+      const { brandById, ramById, storageById } = masterCache.current;
       const modelFor = async (brandId, modelId) => {
-        if (brandId && !modelsCache[brandId]) modelsCache[brandId] = await getModelsByBrand(brandId).catch(() => []);
-        return (modelsCache[brandId] || []).find((m) => m.id === modelId);
+        if (!brandId || !modelId) return null;
+        if (!modelsByBrand.current.has(brandId)) {
+          modelsByBrand.current.set(brandId, await getModelsByBrand(brandId).catch(() => []));
+        }
+        return (modelsByBrand.current.get(brandId) || []).find((m) => m.id === modelId) || null;
+      };
+      const shopFor = async (shopId) => {
+        if (!shopId) return null;
+        if (!shopCache.current.has(shopId)) {
+          shopCache.current.set(shopId, await getShop(shopId).catch(() => null));
+        }
+        return shopCache.current.get(shopId);
       };
       const modelImg = (m) => m?.imageUrl || (m?.imageBase64 ? `data:image/png;base64,${m.imageBase64}` : null);
 
-      await Promise.all((items || []).map(async (o) => {
+      const enrichOne = async (o) => {
         if (tab === 'Sell') {
           const ref = o.referenceId || o.payload?.sellOrderId;
-          if (!ref) return;
+          if (!ref) return null;
+          const cacheKey = `sell:${ref}`;
+          if (enrichedCache.current.has(cacheKey)) return enrichedCache.current.get(cacheKey);
           const so = await getSellOrder(ref).catch(() => null);
-          if (!so) return;
+          if (!so) { enrichedCache.current.set(cacheKey, null); return null; }
           const model = await modelFor(so.brandId, so.modelId);
           const brandName = brandById[so.brandId]?.name;
           const ramStorage = [ramById[so.ramOptionId]?.label, storageById[so.storageOptionId]?.label].filter(Boolean).join(' / ');
-          result[o.id] = {
+          const rec = {
             name: model?.name || (brandName ? `${brandName} device` : 'Sell Device'),
             image: modelImg(model),
             specs: [brandName, so.color, ramStorage].filter(Boolean).join(' · '),
           };
-          return;
+          enrichedCache.current.set(cacheKey, rec);
+          return rec;
         }
         const ref = o.payload?.bookingId || o.referenceId;
-        if (!ref) return;
-        const bk = await getRepairBooking(ref).catch(() => null);
-        if (!bk) return;
-        const model = await modelFor(bk.brandId, bk.modelId);
-        const brandName = brandById[bk.brandId]?.name;
-        const ramStorage = [ramById[bk.ramOptionId]?.label, storageById[bk.storageOptionId]?.label].filter(Boolean).join(' / ');
-        // Resolve the booking's shop (name + address + mobile); booking carries only shopId.
-        let shopName = o.payload?.shopName || null;
-        let shopPhone = null;
-        let shopAddress = null;
-        if (bk.shopId) {
-          if (!(bk.shopId in shopCache)) shopCache[bk.shopId] = await getShop(bk.shopId).catch(() => null);
-          const sh = shopCache[bk.shopId];
-          if (sh) { shopName = sh.name || shopName; shopPhone = sh.phone || sh.mobile || null; shopAddress = sh.address || null; }
-        }
-        result[o.id] = {
-          name: bk.modelName || model?.name || (brandName ? `${brandName} device` : 'Device'),
+        const p = o.payload || {};
+        const cacheKey = `bk:${ref || o.id}`;
+        if (enrichedCache.current.has(cacheKey)) return enrichedCache.current.get(cacheKey);
+        // Service-tab cards already have enough booking data in customer_orders
+        // payload. Avoid a protected detail fan-out here; details/history/receipt
+        // fetch the booking on click.
+        const shouldFetchBooking = ref && tab !== 'Service';
+        const bk = shouldFetchBooking ? await getRepairBooking(ref).catch(() => null) : null;
+        const brandId = bk?.brandId || p.brandId;
+        const modelId = bk?.modelId || p.modelId;
+        const ramOptionId = bk?.ramOptionId || p.ramOptionId;
+        const storageOptionId = bk?.storageOptionId || p.storageOptionId;
+        const color = bk?.color || p.color;
+        const shopId = bk?.shopId || o.shopId || p.shopId;
+        const serviceMode = bk?.serviceMode || p.serviceMode;
+        const bkServices = (bk?.services || []).map((s) => s?.serviceName).filter(Boolean);
+        const payloadServices = (p.services || []).map((s) => s?.serviceName || s?.name).filter(Boolean);
+        const services = bkServices.length ? bkServices : payloadServices;
+        const issueSummary = bk?.issueSummary || p.issueSummary;
+        const model = await modelFor(brandId, modelId);
+        const brandName = brandById[brandId]?.name;
+        const ramStorage = [ramById[ramOptionId]?.label, storageById[storageOptionId]?.label].filter(Boolean).join(' / ');
+        const sh = await shopFor(shopId);
+        const shopName = sh?.name || p.shopName || null;
+        const shopPhone = sh?.phone || sh?.mobile || null;
+        const shopAddress = sh?.address || null;
+        const rec = {
+          name: bk?.modelName || model?.name || (brandName ? `${brandName} device` : null),
           image: modelImg(model),
-          specs: [brandName, bk.color, ramStorage].filter(Boolean).join(' · '),
-          services: (bk.services || []).map((s) => s.serviceName).filter(Boolean),
-          isPickup: bk.serviceMode === 'PICKUP' || !!bk.pickupAddressId || !!bk.pickupDate || !!bk.pickupSlotStart,
+          specs: [brandName, color, ramStorage].filter(Boolean).join(' · '),
+          services,
+          issueSummary,
+          isPickup: serviceMode === 'PICKUP' || !!bk?.pickupAddressId || !!bk?.pickupDate || !!bk?.pickupSlotStart,
           shopName,
           shopPhone,
           shopAddress,
         };
+        enrichedCache.current.set(cacheKey, rec);
+        return rec;
+      };
+
+      // Dedupe by cache key first so two customer_orders rows sharing a
+      // bookingId only trigger one in-flight fetch.
+      const seen = new Map(); // cacheKey -> Promise<rec>
+      const perOrder = await Promise.all((items || []).map(async (o) => {
+        const ref = tab === 'Sell'
+          ? (o.referenceId || o.payload?.sellOrderId)
+          : (o.payload?.bookingId || o.referenceId);
+        const cacheKey = tab === 'Sell' ? `sell:${ref}` : `bk:${ref || o.id}`;
+        if (!seen.has(cacheKey)) seen.set(cacheKey, enrichOne(o));
+        const rec = await seen.get(cacheKey);
+        return [o.id, rec];
       }));
-      if (!cancelled) { setDetails(result); }
+      if (cancelled) return;
+      const next = {};
+      for (const [id, rec] of perOrder) if (rec) next[id] = rec;
+      setDetails(next);
     })();
     return () => { cancelled = true; };
   }, [items, tab]);
@@ -143,6 +206,14 @@ export default function MyOrdersScreen({ navigation }) {
     if (tab === 'Sell') {
       const sid = o.referenceId || o.payload?.sellOrderId;
       if (sid) navigation.navigate('SellOrderDetails', { sellOrderId: sid });
+      return;
+    }
+    // Service tab: rows mirrored from a shop-created ticket carry payload.ticketId
+    // and read from the tickets table. Customer-placed pickups go through the
+    // repair_bookings detail screen as before.
+    const ticketId = o.payload?.ticketId;
+    if (tab === 'Service' && ticketId) {
+      navigation.navigate('ServiceTicketDetails', { ticketId, fromOrders: true });
       return;
     }
     const ref = o.payload?.bookingId || o.referenceId;
@@ -205,6 +276,12 @@ export default function MyOrdersScreen({ navigation }) {
 
       {loading ? (
         <Loader label="Fetching your orders..." />
+      ) : error ? (
+        <EmptyState
+          icon={<Package size={26} color="#DC2626" />}
+          title="Couldn't load orders"
+          description={error}
+        />
       ) : visibleItems.length === 0 ? (
         <EmptyState
           icon={<Package size={26} color="#00008B" />}
@@ -283,6 +360,10 @@ export default function MyOrdersScreen({ navigation }) {
                       Repair: {d.services.join(', ')}
                     </Text>
                   )
+                ) : d.issueSummary && tab !== 'Service' ? (
+                  <Text className="text-[11px] text-text-muted mt-1.5" numberOfLines={2}>
+                    Repair: {d.issueSummary}
+                  </Text>
                 ) : null}
 
                 {/* Shop name + address + mobile number */}

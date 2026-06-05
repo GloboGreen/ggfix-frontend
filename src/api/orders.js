@@ -1,4 +1,4 @@
-import { orderApi } from './client';
+import { orderApi, ticketApi } from './client';
 
 function unwrap(list) {
   return Array.isArray(list) ? list : (list?.content ?? list?.data ?? []);
@@ -14,6 +14,14 @@ export async function getMyOrder(id) {
 // Checkout the cart into a BUY order (shows in My Orders → Buy tab).
 export async function createBuyOrder({ items, totalAmount }) {
   return await orderApi.post('/customer-orders/buy', { body: { items, totalAmount } });
+}
+
+// Customer-side ticket read. Used by the My Orders → Service tab → View Details
+// flow when the row is shop-created (payload.ticketId set). Backend masks the
+// device security value before returning. skipAuthExpiry mirrors getRepairBooking
+// so a 403 here doesn't bounce the customer to Login.
+export async function getServiceTicket(id) {
+  return await ticketApi.get(`/tickets/customer/${id}`, { skipAuthExpiry: true });
 }
 
 // Repair bookings
@@ -38,8 +46,19 @@ export async function rescheduleRepairBooking(id, payload) {
 export async function listShopRepairBookings() {
   return unwrap(await orderApi.get('/repair-bookings/shop'));
 }
+export async function getShopRepairBooking(id) {
+  return await orderApi.get(`/repair-bookings/shop/${id}`);
+}
 export async function postShopBookingStatus(id, payload) {
   return await orderApi.post(`/repair-bookings/${id}/shop-status`, { body: payload });
+}
+export async function confirmShopRepairBooking(id) {
+  return await orderApi.post(`/repair-bookings/${id}/confirm-order`);
+}
+export async function assignPickupPerson(id, { pickupPersonId, pickupPersonName, pickupPersonPhone } = {}) {
+  return await orderApi.post(`/repair-bookings/${id}/assign-pickup`, {
+    body: { pickupPersonId, pickupPersonName, pickupPersonPhone },
+  });
 }
 export async function cancelRepairBooking(id) {
   return await orderApi.post(`/repair-bookings/${id}/cancel`);

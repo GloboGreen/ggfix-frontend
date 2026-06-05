@@ -56,6 +56,8 @@ import OwnerKycUploadScreen from '../screens/owner/OwnerKycUploadScreen';
 import OwnerKycReviewScreen from '../screens/owner/OwnerKycReviewScreen';
 import OwnerKycPendingScreen from '../screens/owner/OwnerKycPendingScreen';
 import OwnerPickupOptionsScreen from '../screens/owner/OwnerPickupOptionsScreen';
+import OwnerPickupServiceListScreen from '../screens/owner/OwnerPickupServiceListScreen';
+import OwnerPickupServiceDetailScreen from '../screens/owner/OwnerPickupServiceDetailScreen';
 import OwnerEmployeeListScreen from '../screens/owner/OwnerEmployeeListScreen';
 import OwnerEmployeeDetailScreen from '../screens/owner/OwnerEmployeeDetailScreen';
 import OwnerEmployeeCreatedScreen from '../screens/owner/OwnerEmployeeCreatedScreen';
@@ -239,6 +241,8 @@ export default function OwnerNavigator({ session, onLogout }) {
       <Stack.Screen name="OwnerKycReview" component={OwnerKycReviewScreen} options={{ title: 'KYC Documents' }} />
       <Stack.Screen name="OwnerKycPending" component={OwnerKycPendingScreen} options={{ title: 'KYC Status' }} />
       <Stack.Screen name="OwnerPickupOptions" component={OwnerPickupOptionsScreen} options={{ title: 'Service Pickup Options' }} />
+      <Stack.Screen name="OwnerPickupServiceList" component={OwnerPickupServiceListScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="OwnerPickupServiceDetail" component={OwnerPickupServiceDetailScreen} options={{ headerShown: false }} />
       <Stack.Screen name="OwnerEmployeeList" component={OwnerEmployeeListScreen} options={{ title: 'Employee Management' }} />
       <Stack.Screen name="OwnerEmployeeAdd" component={OwnerEmployeeAddScreen} options={{ title: 'Add Staff' }} />
       <Stack.Screen name="OwnerEmployeeDetail" component={OwnerEmployeeDetailScreen} options={{ title: 'Employee Details' }} />

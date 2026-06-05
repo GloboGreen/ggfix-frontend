@@ -19,7 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { authApi, ticketApi } from '../../api/client';
 import { selectShopId } from '../../store/authSlice';
 
-const ROLES = ['Junior Technician', 'Technician', 'Senior Technician', 'Employee'];
+const ROLES = ['Junior Technician', 'Technician', 'Senior Technician', 'Pickup Person', 'Employee'];
 const ID_TYPES = ['Aadhar', 'PAN'];
 const SALARY_PERIODS = ['Monthly', 'Weekly'];
 

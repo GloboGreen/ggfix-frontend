@@ -212,6 +212,7 @@ export default function DashboardScreen({ navigation }) {
         <View className="px-3 flex-row flex-wrap">
           {[
             { key: 'NewBooking',   label: 'New Booking',      icon: PlusCircle, color: '#00008B', bg: '#EEF2FF', via: 'parent' },
+            { key: 'OwnerPickupServiceList', label: 'Pickup Service', icon: Truck, color: '#16A34A', bg: '#DCFCE7', via: 'parent' },
             // 'Bookings' is a sibling TAB (not a Stack route), so navigate at tab level — no `via: parent`.
             { key: 'Bookings',     label: 'All Bookings',     icon: ClipboardList, color: '#0EA5E9', bg: '#E0F2FE' },
             { key: 'Billing',      label: 'Billing & Delivery', icon: Receipt,  color: '#2563EB', bg: '#DBEAFE' },

@@ -10,8 +10,14 @@ export async function createPickup(payload) {
 export async function listPickups(status) {
   return unwrap(await pickupApi.get('/pickups', { query: status ? { status } : undefined }));
 }
+export async function listShopPickups(status) {
+  return unwrap(await pickupApi.get('/pickups/shop', { query: status ? { status } : undefined }));
+}
 export async function getPickup(id) {
   return await pickupApi.get(`/pickups/${id}`);
+}
+export async function getShopPickup(id) {
+  return await pickupApi.get(`/pickups/shop/${id}`);
 }
 export async function updatePickupStatus(id, status) {
   return await pickupApi.patch(`/pickups/${id}/status`, { query: { status } });

@@ -13,7 +13,7 @@ import {
 } from './config';
 import { getToken, clearSession, notifyAuthExpired } from '../auth/session';
 
-async function request(baseUrlOrNull, method, path, { query, body, headers } = {}) {
+async function request(baseUrlOrNull, method, path, { query, body, headers, skipAuthExpiry } = {}) {
   let base = baseUrlOrNull && typeof baseUrlOrNull === 'string' ? baseUrlOrNull.trim() : '';
   if (!base || !base.startsWith('http')) base = 'http://localhost:8081/';
   else if (!base.endsWith('/')) base = base + '/';
@@ -57,13 +57,14 @@ async function request(baseUrlOrNull, method, path, { query, body, headers } = {
   }
 
   if (!res.ok) {
-    // A 401/403 on a request that DID carry a token means the token is
-    // expired/invalid — clear the stale session and route back to Login.
-    if ((res.status === 401 || res.status === 403) && token) {
+    // Only 401 means the bearer token is missing/invalid/expired. A 403 is a
+    // real authorization failure for that resource and should not clear the
+    // session or cause repeated login/retry churn.
+    if (res.status === 401 && token && !skipAuthExpiry) {
       await clearSession();
       notifyAuthExpired();
     }
-    const message = (res.status === 401 || res.status === 403) && token
+    const message = res.status === 401 && token
       ? 'Your session has expired. Please log in again.'
       : (json && (json.message || json.error)) || text || `HTTP ${res.status}`;
     const err = new Error(message);
@@ -113,7 +114,7 @@ async function uploadRequest(baseUrlOrNull, path, { uri, name, type, fields } = 
   let json;
   try { json = text ? JSON.parse(text) : null; } catch { json = null; }
   if (!res.ok) {
-    if ((res.status === 401 || res.status === 403) && token) { await clearSession(); notifyAuthExpired(); }
+    if (res.status === 401 && token) { await clearSession(); notifyAuthExpired(); }
     const message = (json && (json.message || json.error)) || text || `HTTP ${res.status}`;
     const err = new Error(message);
     err.status = res.status;

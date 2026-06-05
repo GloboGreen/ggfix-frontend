@@ -50,8 +50,7 @@ export default function RepairReviewScreen({ navigation, route }) {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: isVideo ? ImagePicker.MediaTypeOptions.Videos : ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: !isVideo,
-        aspect: !isVideo ? [3, 4] : undefined,
+        allowsEditing: false,
         quality: 0.7,
         videoMaxDuration: 30,
       });
