@@ -140,14 +140,26 @@ export default function CustomerDetailsScreen({ navigation, route }) {
           body: { platformUserId: resolved.platformUserId || resolved.id },
         });
       }
-      // Nothing matched — create a fresh shop customer.
+      // Nothing matched — create a fresh customer in customer_users +
+      // customer_addresses. Structured fields land in their own columns so
+      // the customer app can prefill them later; we also still send the
+      // legacy `address` concat so older backends keep working.
       if (!resolved) {
+        const structured = {
+          addressLine: data.addressLine?.trim() || null,
+          locality:    data.taluk?.trim()       || data.area?.trim() || null,
+          city:        data.district?.trim()    || null,
+          state:       data.state?.trim()       || null,
+          pincode:     data.pincode?.trim()     || null,
+        };
         resolved = await ticketApi.post('/customers', {
           body: {
             name: data.name.trim(),
             phone: data.phone.trim(),
             email: data.email.trim() || null,
-            address: [data.addressLine, data.area, data.taluk, data.district, data.state, data.pincode].filter(Boolean).join(', '),
+            ...structured,
+            address: [data.addressLine, data.area, data.taluk, data.district, data.state, data.pincode]
+              .filter(Boolean).join(', '),
           },
         });
       }

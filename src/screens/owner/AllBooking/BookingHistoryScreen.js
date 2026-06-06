@@ -21,6 +21,11 @@ import {
 import { ticketApi } from '../../../api/client';
 import { getModelsByBrand } from '../../../api/masterData';
 
+// Labels mirror the admin "Technician Work Status" master list so the badge
+// reads the same wording the technician (and customer history rail) see when
+// a work-status submit advances the ticket lifecycle through the master row's
+// ticket_status mapping (READY → "Ready for Delivery", DELIVERED →
+// "Delivered to Customer", ...).
 const STATUS_VARIANT = {
   CREATED:           { variant: 'softWarning', label: 'Service Accepted' },
   ASSIGNED:          { variant: 'softPrimary', label: 'Technician Assigned' },
@@ -28,8 +33,8 @@ const STATUS_VARIANT = {
   IN_REPAIR:         { variant: 'softSecondary', label: 'In Service Process' },
   QUOTED:            { variant: 'softWarning', label: 'Re-Estimated' },
   APPROVED:          { variant: 'softPrimary', label: 'Customer Approved' },
-  READY:             { variant: 'softSuccess', label: 'Out For Delivery' },
-  DELIVERED:         { variant: 'softSuccess', label: 'Delivered' },
+  READY:             { variant: 'softSuccess', label: 'Ready for Delivery' },
+  DELIVERED:         { variant: 'softSuccess', label: 'Delivered to Customer' },
   CANCELLED:         { variant: 'softDanger',  label: 'Cancelled' },
   RETURNED:          { variant: 'softDanger',  label: 'Returned' },
 };
@@ -38,8 +43,8 @@ const STATUS_FILTERS = [
   { key: 'ALL',       label: 'All' },
   { key: 'CREATED',   label: 'Service Accepted' },
   { key: 'IN_REPAIR', label: 'In Service' },
-  { key: 'READY',     label: 'Out For Delivery' },
-  { key: 'DELIVERED', label: 'Delivered' },
+  { key: 'READY',     label: 'Ready for Delivery' },
+  { key: 'DELIVERED', label: 'Delivered to Customer' },
   { key: 'CANCELLED', label: 'Cancelled' },
 ];
 

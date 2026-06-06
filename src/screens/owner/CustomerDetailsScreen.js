@@ -155,12 +155,20 @@ export default function CustomerDetailsScreen({ route, navigation }) {
     if (mode === 'new') {
       setSaving(true);
       try {
+        // Backend writes customer_users + customer_addresses; structured
+        // fields land in their own columns. Still send the legacy `address`
+        // concat for backward-compat with older deployments.
         const created = await ticketApi.post('/customers', {
           body: {
             name: form.name.trim(),
             phone: displayPhone,
             email: form.email?.trim() || undefined,
-            address: buildAddress() || undefined,
+            addressLine: form.doorStreet?.trim() || undefined,
+            locality:    form.taluk?.trim() || form.area?.trim() || undefined,
+            city:        form.district?.trim() || undefined,
+            state:       form.state?.trim() || undefined,
+            pincode:     form.pincode?.trim() || undefined,
+            address:     buildAddress() || undefined,
           },
         });
         navigation.navigate('ChooseDevice', {

@@ -1,175 +1,141 @@
-// Shared service-history phase definitions + render component. Both the
-// customer "Service History" screen and the owner "Booking Timeline" screen
-// pull from this module so the timeline UI stays in sync.
+// Shop-side booking Service History timeline.
 //
-// Each step.key matches the `status` written into repair_booking_events
-// (customer side) or returned by /tickets/{id}/events (owner side).
+// One source of truth for the 16 statuses the shop / owner / customer /
+// technician views all render in the same order. Each render row maps to
+// exactly one row in `repair_booking_events.status` — no nested phases, no
+// duplicates. Backend emit code writes these status keys verbatim.
 import React from 'react';
 import { Text, View } from 'react-native';
 
-export const SERVICE_PHASES = [
-  {
-    key: 'SERVICE_ACCEPTED', label: 'Service Accepted', color: 'success',
-    steps: [
-      { key: 'ORDER_PLACED',        text: 'Your Booking has been placed' },
-      { key: 'ASSIGN_TECHNICIAN',   text: 'Assign to Technician' },
-      { key: 'ASSIGN_NOT_ACCEPTED', text: 'Assign to technician not accepted', danger: true },
-      { key: 'REASSIGN_TECHNICIAN', text: 'Re-Assign to Technician' },
-      { key: 'TECHNICIAN_ACCEPTED', text: 'Technician accepted the service' },
-    ],
-  },
-  {
-    key: 'IN_SERVICE_PROCESS', label: 'In Service Process', color: 'success',
-    steps: [
-      { key: 'TECH_WORK_STARTED',    text: 'Technician Work Started' },
-      { key: 'TECH_UPLOADED_IMAGES', text: 'Technician uploaded device images' },
-      { key: 'TECH_COMPLIANCE',      text: 'Technician compliance issue has been verified and updated.' },
-      { key: 'ISSUE_IDENTIFIED',     text: 'A motherboard-related issue was identified. The ticket was updated accordingly, the task was reassigned, and the repair work has now started.' },
-      { key: 'WAITING_APPROVAL',     text: 'Waiting for Customer Approval' },
-    ],
-  },
-  {
-    key: 'RE_ESTIMATED_CONFIRMED', label: 'Re-Estimated Confirmed', color: 'secondary',
-    steps: [
-      { key: 'REBOOKING_PLACED',     text: 'Re-Booking has been placed' },
-      { key: 'TECH_WORK_RESTARTED',  text: 'Technician work started' },
-    ],
-  },
-  {
-    key: 'PENDING_SPARE', label: 'Pending', color: 'warning',
-    steps: [
-      { key: 'WAITING_SPARE',        text: 'Waiting for spare part – not available.' },
-      { key: 'SPARE_ORDERED',        text: 'Spare part has been ordered. Service is pending.' },
-    ],
-  },
-  {
-    key: 'IN_SERVICE_PROCESS_2', label: 'In Service Process', color: 'success',
-    steps: [
-      { key: 'TECH_WORK_STARTED_2', text: 'Technician Work Started' },
-      { key: 'TECH_WORK_COMPLETED', text: 'Technician work completed' },
-    ],
-  },
-  {
-    key: 'OUT_FOR_DELIVERY', label: 'Out For Delivery', color: 'success',
-    steps: [{ key: 'OUT_FOR_DELIVERY', text: 'Your device is out for delivery.' }],
-  },
-  {
-    key: 'DELIVERY_TO_DEVICE', label: 'Delivery Present Pickup To Device', color: 'success',
-    steps: [{ key: 'ON_THE_WAY', text: 'Your device is on the way' }],
-  },
-  {
-    key: 'DELIVERED', label: 'Delivered', color: 'success',
-    steps: [{ key: 'DELIVERED', text: 'Your device has been delivered.' }],
-  },
+export const SHOP_BOOKING_STATUS_OPTIONS = [
+  { value: 'BOOKING_CREATED_BY_SHOP',                       label: 'Booking Created by Shop' },
+  { value: 'SERVICE_ACCEPTED',                              label: 'Service Accepted' },
+  { value: 'ASSIGNED_TO_TECHNICIAN',                        label: 'Assigned to Technician' },
+  { value: 'AWAITING_TECHNICIAN_ACCEPTANCE',                label: 'Awaiting Technician Acceptance' },
+  { value: 'REASSIGNED_TO_TECHNICIAN',                      label: 'Re-Assign to Technician' },
+  { value: 'TECHNICIAN_ACCEPTED_SERVICE',                   label: 'Technician Accepted Service' },
+  { value: 'TECHNICIAN_WORK_STARTED',                       label: 'Technician Work Started' },
+  { value: 'TECHNICIAN_UPLOADED_DEVICE_IMAGES',             label: 'Technician Uploaded Device Images' },
+  { value: 'TECHNICIAN_COMPLIANCE_ISSUE_VERIFIED_UPDATED',  label: 'Technician Compliance Issue Verified & Updated' },
+  { value: 'RE_ESTIMATED_CONFIRMED',                        label: 'Re-Estimated Confirmed' },
+  { value: 'CUSTOMER_APPROVED',                             label: 'Customer Approved' },
+  { value: 'CUSTOMER_REJECTED',                             label: 'Customer Rejected' },
+  { value: 'IN_REPAIR',                                     label: 'Repair Work In Progress' },
+  { value: 'PARTS_REQUIRED',                                label: 'Parts Required' },
+  { value: 'PARTS_REPLACED',                                label: 'Parts Replaced' },
+  { value: 'QUALITY_CHECK_STARTED',                         label: 'Quality Check Started' },
+  { value: 'QUALITY_CHECK_COMPLETED',                       label: 'Quality Check Completed' },
+  { value: 'REPAIR_COMPLETED',                              label: 'Repair Completed' },
+  { value: 'READY',                                         label: 'Ready for Delivery' },
+  { value: 'DELIVERED',                                     label: 'Delivered to Customer' },
+  { value: 'CANCELLED',                                     label: 'Work Cancelled' },
 ];
 
-const COLOR_HEX = { success: '#10B981', secondary: '#2563EB', warning: '#F59E0B' };
-const DANGER = '#EF4444';
+const LABEL_BY_KEY = Object.fromEntries(
+  SHOP_BOOKING_STATUS_OPTIONS.map((o) => [o.value, o.label]),
+);
 
-const STATUS_TO_PHASE = {};
-const LABEL_BY_KEY = {};
-SERVICE_PHASES.forEach((p, i) => p.steps.forEach((s) => {
-  STATUS_TO_PHASE[s.key] = i;
-  LABEL_BY_KEY[s.key] = s.text;
-}));
-// Map booking/ticket macro-statuses to the phase they correspond to. Lets the
-// rail light up even when the individual step events haven't been emitted yet.
-Object.assign(STATUS_TO_PHASE, {
-  ORDER_SERVICE_CONFIRMED: 0, IN_REPAIR: 1, IN_SERVICE_PROCESS: 1,
-  RE_ESTIMATED: 2, PENDING: 3, OUT_FOR_DELIVERY: 5, DELIVERED: 7,
-});
+const SUCCESS = '#10B981';      // green dot / line for completed steps
+const DOT_BORDER = '#CBD5E1';   // gray ring around upcoming steps
+const LINE_PENDING = '#E2E8F0'; // connector between unreached steps
 
 function fmt(v) {
   if (!v) return '';
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return '';
   return d.toLocaleString('en-US', {
-    weekday: 'short', month: 'short', day: '2-digit', year: 'numeric', hour: 'numeric', minute: '2-digit',
+    weekday: 'short', month: 'short', day: '2-digit', year: 'numeric',
+    hour: 'numeric', minute: '2-digit',
   });
 }
 
 /**
- * Render the phase-rail timeline. Caller passes the list of events
- * ({ status, note, createdAt, actor }) and the current macro-status string.
+ * Render the shop-side booking timeline.
+ *
+ * Caller passes the events list ({ status, note, createdAt, actor }) and the
+ * booking's current macro-status. Each of the 16 fixed rows lights up green
+ * when a matching event exists OR the booking's macro-status has reached that
+ * step. The most-recent completed step gets the "NOW" badge.
  */
 export function ServiceHistoryTimeline({ events, status }) {
-  const statusUpper = (status || '').toUpperCase();
+  // Index events by status key. Keep the FIRST occurrence so the displayed
+  // timestamp is when that state was entered, not when it was re-emitted.
   const eventByStatus = {};
-  let latest = null;
   (events || []).forEach((e) => {
     const k = (e.status || '').toUpperCase();
     if (!eventByStatus[k]) eventByStatus[k] = e;
-    if (!latest || new Date(e.createdAt || 0) >= new Date(latest.createdAt || 0)) latest = e;
   });
-  const currentKey = (latest?.status || '').toUpperCase();
 
-  let statusPhase = STATUS_TO_PHASE[statusUpper];
-  if (statusPhase == null) statusPhase = -1;
-  let eventPhase = -1;
-  SERVICE_PHASES.forEach((ph, i) => {
-    if (ph.steps.some((s) => eventByStatus[s.key])) eventPhase = Math.max(eventPhase, i);
-  });
-  let currentPhaseIdx = Math.max(statusPhase, eventPhase);
-  if (currentPhaseIdx < 0) currentPhaseIdx = 0;
+  // A step is "completed" iff a matching event row exists. The "current"
+  // step (NOW badge) is the event with the most recent createdAt — not the
+  // highest fixed-list index — so the latest action the technician took
+  // gets the indicator, even when an auto-emitted macro-status event like
+  // IN_REPAIR sits further down the list.
+  const sortedByTime = (events || []).slice().sort(
+    (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0),
+  );
+  const latestKey = (sortedByTime[0]?.status || '').toUpperCase();
+  let currentIndex = SHOP_BOOKING_STATUS_OPTIONS.findIndex((o) => o.value === latestKey);
+  if (currentIndex < 0) {
+    // Latest event isn't in the canonical list — fall back to the highest
+    // indexed step that does have an event so we still mark something current.
+    SHOP_BOOKING_STATUS_OPTIONS.forEach((opt, i) => {
+      if (eventByStatus[opt.value]) currentIndex = i;
+    });
+  }
 
   return (
     <View>
-      {SERVICE_PHASES.map((phase, i) => {
-        const reached = i <= currentPhaseIdx;
-        const isLast = i === SERVICE_PHASES.length - 1;
-        const hex = COLOR_HEX[phase.color] || COLOR_HEX.success;
-        let phaseDate = '';
-        for (const s of phase.steps) {
-          const ev = eventByStatus[s.key];
-          if (ev?.createdAt) { phaseDate = fmt(ev.createdAt); break; }
-        }
+      {SHOP_BOOKING_STATUS_OPTIONS.map((opt, i) => {
+        const ev = eventByStatus[opt.value];
+        const completed = !!ev;
+        const isCurrent = i === currentIndex && completed;
+        const isLast = i === SHOP_BOOKING_STATUS_OPTIONS.length - 1;
+        // Connector to the next step lights up only when BOTH the current
+        // step and the next step are completed — a gap in events shows as a
+        // gray segment, not as a green bar passing through nothing.
+        const nextOpt = SHOP_BOOKING_STATUS_OPTIONS[i + 1];
+        const nextCompleted = nextOpt ? !!eventByStatus[nextOpt.value] : false;
+        const lineCompleted = completed && nextCompleted;
         return (
-          <View key={phase.key} className="flex-row">
+          <View key={opt.value} className="flex-row">
             <View className="items-center mr-3" style={{ width: 18 }}>
               <View
                 style={{
                   width: 14, height: 14, borderRadius: 7,
-                  backgroundColor: reached ? hex : '#FFFFFF',
-                  borderWidth: reached ? 0 : 2, borderColor: '#CBD5E1',
+                  backgroundColor: completed ? SUCCESS : '#FFFFFF',
+                  borderWidth: completed ? 0 : 2, borderColor: DOT_BORDER,
                   marginTop: 2,
                 }}
               />
               {!isLast ? (
-                <View className="flex-1 my-1" style={{ width: 2, backgroundColor: i < currentPhaseIdx ? hex : '#E2E8F0' }} />
+                <View
+                  className="flex-1 my-1"
+                  style={{ width: 2, backgroundColor: lineCompleted ? SUCCESS : LINE_PENDING }}
+                />
               ) : null}
             </View>
             <View className="flex-1 pb-4">
               <View className="flex-row items-center justify-between">
-                <Text className={`text-[13px] flex-1 pr-2 ${reached ? 'font-extrabold text-text' : 'font-bold text-text-muted'}`}>
-                  {phase.label}
+                <Text
+                  className={`text-[13px] flex-1 pr-2 ${
+                    completed ? 'font-extrabold text-text' : 'font-bold text-text-muted'
+                  }`}
+                >
+                  {opt.label}
                 </Text>
-                {phaseDate ? <Text className="text-[10px] text-text-muted">{phaseDate}</Text> : null}
-              </View>
-              {phase.steps.map((step) => {
-                const ev = eventByStatus[step.key];
-                const done = !!ev || i < currentPhaseIdx;
-                const isCurrent = step.key === currentKey;
-                return (
-                  <View key={step.key} className="mt-1.5">
-                    <View className="flex-row items-center">
-                      <Text
-                        className={`text-[11px] flex-1 ${step.danger ? '' : (done ? 'text-text' : 'text-text-muted')} ${isCurrent ? 'font-extrabold' : ''}`}
-                        style={step.danger ? { color: DANGER } : undefined}
-                      >
-                        {ev?.note || step.text}
-                      </Text>
-                      {isCurrent ? (
-                        <View className="bg-success/15 rounded-full px-1.5 py-0.5 ml-1">
-                          <Text className="text-[8px] font-extrabold text-success">NOW</Text>
-                        </View>
-                      ) : null}
-                    </View>
-                    {ev?.createdAt ? (
-                      <Text className="text-[9px] text-text-muted mt-0.5">{fmt(ev.createdAt)}</Text>
-                    ) : null}
+                {isCurrent ? (
+                  <View className="bg-success/15 rounded-full px-1.5 py-0.5 ml-1">
+                    <Text className="text-[8px] font-extrabold text-success">NOW</Text>
                   </View>
-                );
-              })}
+                ) : null}
+              </View>
+              {ev?.createdAt ? (
+                <Text className="text-[10px] text-text-muted mt-1">{fmt(ev.createdAt)}</Text>
+              ) : null}
+              {ev?.note && ev.note !== opt.label ? (
+                <Text className="text-[11px] text-text mt-0.5">{ev.note}</Text>
+              ) : null}
             </View>
           </View>
         );
@@ -178,14 +144,18 @@ export function ServiceHistoryTimeline({ events, status }) {
   );
 }
 
+/**
+ * Plain-text label of the booking's current step — used by the order
+ * summary cards that need a one-line status without rendering the rail.
+ */
 export function getCurrentPhaseLabel(events, status) {
-  const eventByStatus = {};
-  let latest = null;
-  (events || []).forEach((e) => {
-    const k = (e.status || '').toUpperCase();
-    if (!eventByStatus[k]) eventByStatus[k] = e;
-    if (!latest || new Date(e.createdAt || 0) >= new Date(latest.createdAt || 0)) latest = e;
-  });
-  const currentKey = (latest?.status || '').toUpperCase();
-  return latest?.note || LABEL_BY_KEY[currentKey] || (status || '').replace(/_/g, ' ');
+  const sorted = (events || []).slice().sort(
+    (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0),
+  );
+  const latest = sorted[0];
+  const key = (latest?.status || '').toUpperCase();
+  if (LABEL_BY_KEY[key]) return LABEL_BY_KEY[key];
+  const statusUpper = (status || '').toUpperCase();
+  if (LABEL_BY_KEY[statusUpper]) return LABEL_BY_KEY[statusUpper];
+  return latest?.note || (status || '').replace(/_/g, ' ');
 }

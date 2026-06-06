@@ -339,7 +339,11 @@ export default function MyOrdersScreen({ navigation }) {
                     ) : null}
                   </View>
                   <View className="items-end">
-                    <Badge variant={variant}>{(o.status || '').replace(/_/g, ' ')}</Badge>
+                    <Badge variant={variant}>{
+                      (tab === 'Service' && o.phaseLabel)
+                        ? o.phaseLabel
+                        : (o.status || '').replace(/_/g, ' ')
+                    }</Badge>
                     {tab === 'Sell' ? (
                       <View className="mt-2"><ChevronRight size={18} color="#94A3B8" /></View>
                     ) : null}
@@ -382,10 +386,14 @@ export default function MyOrdersScreen({ navigation }) {
                   </View>
                 ) : null}
 
-                {/* Status line (service) */}
+                {/* Status line (service)
+                    Prefer the live timeline phase the backend derives from
+                    repair_booking_events.latest so the card reflects "Technician
+                    Work Started" / "Customer Approved" / etc. instead of the
+                    static customer_orders.status. */}
                 {tab === 'Service' ? (
                   <Text className="text-[11px] font-bold text-success mt-1.5" numberOfLines={2}>
-                    Status : {(o.status || '').replace(/_/g, ' ')}
+                    Status : {o.phaseLabel || (o.status || '').replace(/_/g, ' ')}
                   </Text>
                 ) : null}
 

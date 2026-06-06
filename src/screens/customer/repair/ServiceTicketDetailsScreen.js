@@ -62,6 +62,16 @@ function parseJsonSafe(raw, fallback) {
   try { return JSON.parse(raw); } catch { return fallback; }
 }
 
+// technicianPhotosJson is always a flat URL array (employee app submits it that
+// way). Items can be strings or { url } objects; normalize to a string[].
+function parseTechnicianPhotos(raw) {
+  const arr = parseJsonSafe(raw, []);
+  if (!Array.isArray(arr)) return [];
+  return arr
+    .map((it) => (typeof it === 'string' ? it : (it?.url || it?.uri || it?.imageUrl || null)))
+    .filter(Boolean);
+}
+
 function PriceLine({ index, label, amount }) {
   return (
     <View className="flex-row items-center py-1.5">
@@ -151,6 +161,7 @@ export default function ServiceTicketDetailsScreen({ navigation, route }) {
   const tracking = t.trackingId ? (String(t.trackingId).startsWith('#') ? t.trackingId : `#${t.trackingId}`) : null;
   const priceItems = parseJsonSafe(t.priceItemsJson, []);
   const photos = parseJsonSafe(t.devicePhotosJson, {}) || {};
+  const technicianPhotos = parseTechnicianPhotos(t.technicianPhotosJson);
   const missingPartsArr = parseJsonSafe(t.missingPartsJson, []) || [];
   const missingPartsLabels = (Array.isArray(missingPartsArr) ? missingPartsArr : [])
     .map((it) => (it && typeof it === 'object' ? (it.label || it.name) : String(it)))
@@ -293,6 +304,40 @@ export default function ServiceTicketDetailsScreen({ navigation, route }) {
               </Text>
               <Text className="text-[11px] text-text-muted">Technician</Text>
             </SectionCard>
+          ) : null}
+
+          {/* Technician uploaded device photos */}
+          {t.assignedTechnicianName || technicianPhotos.length > 0 ? (
+            <Card className="rounded-2xl mb-3">
+              <View className="flex-row items-center justify-between mb-2">
+                <Text className="text-[12px] font-extrabold text-text" numberOfLines={1}>
+                  {t.assignedTechnicianName || 'Technician'}
+                  {t.assignedTechnicianCode ? (
+                    <Text className="text-text-muted font-normal"> {'—'} {t.assignedTechnicianCode}</Text>
+                  ) : null}
+                </Text>
+                <Text className="text-[11px] text-text-muted ml-2">Technician uploaded device photos</Text>
+              </View>
+              <View className="flex-row -mx-1">
+                {[0, 1, 2].map((i) => (
+                  <View key={i} style={{ width: '33.333%' }} className="p-1">
+                    <View
+                      className="rounded-xl items-center justify-center overflow-hidden bg-background"
+                      style={{ aspectRatio: 1, borderWidth: 1, borderStyle: 'dashed', borderColor: '#A5B4FC' }}
+                    >
+                      {technicianPhotos[i] ? (
+                        <Image source={{ uri: technicianPhotos[i] }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                      ) : (
+                        <View className="items-center px-2">
+                          <Camera size={18} color="#94A3B8" />
+                          <Text className="text-[9px] text-text-muted text-center mt-1">Take a photo of the device</Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </Card>
           ) : null}
         </View>
       </ScrollView>

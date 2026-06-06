@@ -1,5 +1,5 @@
-import React, { useCallback, useState } from 'react';
-import { Image, Pressable, ScrollView, Share, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Image, Pressable, ScrollView, Share, Text, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   Smartphone,
@@ -19,7 +19,17 @@ import {
   RefreshCcw,
   CheckCircle2,
   AlertCircle,
+  Check,
 } from 'lucide-react-native';
+
+// Three closing booking steps the owner records by ticking + Submit on the
+// Booking Details screen. Each row POSTs /tickets/{id}/progress-events; the
+// customer/owner Service History rail lights up the matching row.
+const OWNER_PROGRESS_ROWS = [
+  { key: 'READY',     label: 'Ready for Delivery' },
+  { key: 'DELIVERED', label: 'Delivered to Customer' },
+  { key: 'CANCELLED', label: 'Work Cancelled' },
+];
 import {
   Avatar,
   Card,
@@ -103,6 +113,52 @@ export default function TicketDetailScreen({ route, navigation }) {
 
   // Reload on focus — picks up EditBooking + AssignTechnician changes when user comes back.
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  // Service Progress (owner-side) — Ready / Delivered / Cancelled checklist.
+  // Pre-ticks rows the OWNER has already submitted; auto-emitted macro-status
+  // events (actor=SHOP / SYSTEM) leave the checkbox empty so the owner still
+  // has to take the action manually.
+  const [progressChecked, setProgressChecked] = useState({});
+  const [progressDone, setProgressDone] = useState({});
+  const [progressBusy, setProgressBusy] = useState(null);
+
+  const refreshProgress = useCallback(async () => {
+    if (!ticketId) return;
+    try {
+      const rows = await ticketApi.get(`/tickets/${ticketId}/events`);
+      const done = {};
+      (Array.isArray(rows) ? rows : []).forEach((e) => {
+        const k = (e.status || '').toUpperCase();
+        const actor = (e.actor || '').toUpperCase();
+        if (actor === 'OWNER' && OWNER_PROGRESS_ROWS.some((r) => r.key === k)) {
+          done[k] = true;
+        }
+      });
+      setProgressDone(done);
+    } catch { /* keep current */ }
+  }, [ticketId]);
+
+  useEffect(() => { refreshProgress(); }, [refreshProgress]);
+
+  const submitProgress = useCallback(async (row) => {
+    if (!progressChecked[row.key] && !progressDone[row.key]) {
+      notify('Tick the box first', `Check "${row.label}" before submitting.`);
+      return;
+    }
+    setProgressBusy(row.key);
+    try {
+      await ticketApi.post(`/tickets/${ticketId}/progress-events`, {
+        body: { statusKey: row.key, actor: 'OWNER' },
+      });
+      setProgressChecked((prev) => ({ ...prev, [row.key]: false }));
+      refreshProgress();
+      notify('Saved', `"${row.label}" recorded.`);
+    } catch (e) {
+      notify('Save failed', e?.message || 'Try again');
+    } finally {
+      setProgressBusy(null);
+    }
+  }, [ticketId, progressChecked, progressDone, refreshProgress]);
 
   const handleShare = async () => {
     if (!ticket) return;
@@ -373,6 +429,71 @@ export default function TicketDetailScreen({ route, navigation }) {
           </View>
           <ChevronRight size={16} color="#fff" />
         </Pressable>
+
+        {/* Service Progress checklist — owner records the closing booking steps
+            (Ready for Delivery / Delivered to Customer / Work Cancelled). Each
+            Submit POSTs /tickets/{id}/progress-events with actor=OWNER; the
+            customer's Service History rail lights up that step in real time. */}
+        <Text className="text-[13px] font-extrabold text-text mt-5 mb-2">Service Progress</Text>
+        <View
+          className="bg-white rounded-md overflow-hidden"
+          style={{ borderWidth: 1, borderColor: '#E2E8F0' }}
+        >
+          <View className="flex-row" style={{ backgroundColor: '#F1F5F9', paddingHorizontal: 8, paddingVertical: 6 }}>
+            <Text className="text-[10px] font-bold text-text-muted" style={{ width: 28 }}>S.No</Text>
+            <Text className="text-[10px] font-bold text-text-muted flex-1">Status</Text>
+            <Text className="text-[10px] font-bold text-text-muted" style={{ width: 40, textAlign: 'center' }}>Tick</Text>
+            <Text className="text-[10px] font-bold text-text-muted" style={{ width: 64, textAlign: 'center' }}>Action</Text>
+          </View>
+          {OWNER_PROGRESS_ROWS.map((row, idx) => {
+            const checked = !!progressChecked[row.key];
+            const done = !!progressDone[row.key];
+            const busy = progressBusy === row.key;
+            return (
+              <View
+                key={row.key}
+                className="flex-row items-center"
+                style={{
+                  paddingHorizontal: 8, paddingVertical: 8,
+                  borderTopWidth: idx > 0 ? 1 : 0, borderTopColor: '#F1F5F9',
+                  backgroundColor: done ? '#F0FDF4' : '#FFFFFF',
+                }}
+              >
+                <Text className="text-[11px] text-text" style={{ width: 28 }}>{idx + 1}</Text>
+                <Text className={`text-[12px] flex-1 ${done ? 'font-bold' : ''} text-text`}>{row.label}</Text>
+                <View style={{ width: 40, alignItems: 'center' }}>
+                  <Pressable
+                    onPress={() => setProgressChecked((prev) => ({ ...prev, [row.key]: !prev[row.key] }))}
+                    style={{
+                      width: 20, height: 20, borderRadius: 4,
+                      borderWidth: 1.5,
+                      borderColor: checked || done ? '#22C55E' : '#94A3B8',
+                      backgroundColor: checked || done ? '#22C55E' : '#FFFFFF',
+                      alignItems: 'center', justifyContent: 'center',
+                    }}
+                  >
+                    {(checked || done) ? <Check size={14} color="#FFFFFF" /> : null}
+                  </Pressable>
+                </View>
+                <View style={{ width: 64, alignItems: 'center' }}>
+                  <TouchableOpacity
+                    onPress={() => submitProgress(row)}
+                    disabled={busy}
+                    className="rounded-md"
+                    style={{
+                      backgroundColor: '#22C55E', paddingHorizontal: 10, paddingVertical: 5,
+                      opacity: busy ? 0.6 : 1,
+                    }}
+                  >
+                    {busy
+                      ? <ActivityIndicator color="#FFFFFF" size="small" />
+                      : <Text className="text-white text-[10px] font-bold">Submit</Text>}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            );
+          })}
+        </View>
       </ScrollView>
     </View>
   );

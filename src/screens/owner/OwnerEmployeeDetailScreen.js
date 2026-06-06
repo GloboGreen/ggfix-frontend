@@ -31,6 +31,11 @@ export default function OwnerEmployeeDetailScreen({ route, navigation }) {
   const employee = route.params?.employee;
   const mode = route.params?.mode || (employee ? 'view' : 'add');
   const isAdd = mode === 'add';
+  const isEdit = mode === 'edit';
+
+  useEffect(() => {
+    if (isEdit) navigation.setOptions?.({ title: 'Edit Profile' });
+  }, [isEdit, navigation]);
 
   const [active, setActive] = useState(employee?.isAvailable !== false);
   const [saving, setSaving] = useState(false);
@@ -230,6 +235,46 @@ export default function OwnerEmployeeDetailScreen({ route, navigation }) {
     }
   };
 
+  const handleSaveEdit = async () => {
+    if (!employee?.id) return;
+    if (!form.name?.trim()) {
+      Alert.alert('Required', 'Enter employee name');
+      return;
+    }
+    if (Object.values(uploading).some(Boolean)) {
+      Alert.alert('Please wait', 'An image is still uploading.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const body = {
+        name: form.name.trim(),
+        phone: (form.phone && form.phone.trim()) || null,
+        email: (form.email && form.email.trim()) || null,
+        roleLabel: (form.roleLabel && form.roleLabel.trim()) || null,
+        salaryAmount: (form.salaryAmount && String(form.salaryAmount).trim()) || null,
+        salaryPeriod: (form.salaryPeriod && form.salaryPeriod.trim()) || null,
+        idVerificationType: (form.idVerificationType && form.idVerificationType.trim()) || null,
+        idNumber: (form.idNumber && form.idNumber.trim()) || null,
+        dateOfBirth: (form.dateOfBirth && form.dateOfBirth.trim()) || null,
+        dateOfJoin: (form.dateOfJoin && form.dateOfJoin.trim()) || null,
+        defaultCheckIn: (form.defaultCheckIn && form.defaultCheckIn.trim()) || null,
+        defaultCheckOut: (form.defaultCheckOut && form.defaultCheckOut.trim()) || null,
+        photoUrl: (form.photoUrl && form.photoUrl.trim()) || null,
+        dailyWage: (form.dailyWage && String(form.dailyWage).trim()) || null,
+        idFrontUrl: (form.idFrontUrl && form.idFrontUrl.trim()) || null,
+        idBackUrl: (form.idBackUrl && form.idBackUrl.trim()) || null,
+      };
+      await ticketApi.patch(`/technicians/${employee.id}`, { body });
+      Alert.alert('Saved', 'Profile updated.');
+      navigation.goBack();
+    } catch (e) {
+      Alert.alert('Error', e.message || 'Failed to update employee');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleToggleActive = async (value) => {
     if (!employee?.id) return;
     setActive(value);
@@ -274,7 +319,7 @@ export default function OwnerEmployeeDetailScreen({ route, navigation }) {
   const formatAdvanceDate = (d) => (d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
   const formatLeaveDate = (d) => (d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
 
-  if (isAdd) {
+  if (isAdd || isEdit) {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
         <KeyboardAvoidingView
@@ -621,7 +666,7 @@ export default function OwnerEmployeeDetailScreen({ route, navigation }) {
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.footerCreate, saving && styles.saveBtnDisabled]}
-              onPress={handleSaveNew}
+              onPress={isEdit ? handleSaveEdit : handleSaveNew}
               disabled={saving}
               activeOpacity={0.85}
             >
@@ -630,7 +675,9 @@ export default function OwnerEmployeeDetailScreen({ route, navigation }) {
               ) : (
                 <>
                   <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" />
-                  <Text style={styles.footerCreateText}>Create Employee</Text>
+                  <Text style={styles.footerCreateText}>
+                    {isEdit ? 'Save Changes' : 'Create Employee'}
+                  </Text>
                 </>
               )}
             </TouchableOpacity>
@@ -674,6 +721,7 @@ export default function OwnerEmployeeDetailScreen({ route, navigation }) {
       ? [{ key: 'pickup', icon: 'car-outline',    label: 'Pickup\nReport',        route: 'OwnerEmployeePickupReport' }]
       : []),
     { key: 'salary',   icon: 'receipt-outline',   label: 'Salary\nReport',        route: 'OwnerEmployeeSalaryReport' },
+    { key: 'edit',     icon: 'create-outline',    label: 'Edit\nProfile',         route: 'OwnerEmployeeDetail', params: { employee, mode: 'edit' } },
   ];
 
   const confirmToggleActive = () => {
@@ -748,7 +796,7 @@ export default function OwnerEmployeeDetailScreen({ route, navigation }) {
             <TouchableOpacity
               key={c.key}
               style={styles.catItem}
-              onPress={() => navigation.navigate(c.route, { employee })}
+              onPress={() => navigation.push(c.route, c.params || { employee })}
               activeOpacity={0.8}
             >
               <View style={styles.catIconWrap}>

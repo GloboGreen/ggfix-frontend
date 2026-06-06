@@ -34,6 +34,19 @@ function parseDevicePhotos(ticket) {
   return {};
 }
 
+// technicianPhotosJson is a flat URL array submitted by the employee app.
+// Items may be strings or { url } objects — normalize to string[].
+function parseTechnicianPhotos(ticket) {
+  if (!ticket?.technicianPhotosJson) return [];
+  try {
+    const p = JSON.parse(ticket.technicianPhotosJson);
+    if (!Array.isArray(p)) return [];
+    return p
+      .map((x) => (typeof x === 'string' ? x : (x?.url || x?.uri || x?.imageUrl || null)))
+      .filter(Boolean);
+  } catch (_) { return []; }
+}
+
 function parseMissingParts(ticket) {
   if (!ticket?.missingPartsJson) return [];
   try {
@@ -116,6 +129,7 @@ export default function DeviceDetailScreen({ route, navigation }) {
     ? ticket.estimatedPrice
     : lineItems.reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
   const photos = parseDevicePhotos(ticket);
+  const technicianPhotos = parseTechnicianPhotos(ticket);
   const missingParts = parseMissingParts(ticket);
   const readyAtText = formatDateTime(ticket.estimatedReadyAt);
   const deliveryAtText = formatDateTime(ticket.estimatedDeliveryAt);
@@ -276,6 +290,42 @@ export default function DeviceDetailScreen({ route, navigation }) {
             {technician?.roleLabel ? (
               <Text className="text-[11px] text-text-muted mt-0.5">{technician.roleLabel}</Text>
             ) : null}
+          </Card>
+        ) : null}
+
+        {/* Technician uploaded device photos */}
+        {(ticket.assignedTechnicianId || technician || technicianPhotos.length > 0) ? (
+          <Card className="rounded-2xl mb-2.5">
+            <View className="flex-row items-center justify-between mb-2">
+              <Text className="text-[12px] font-extrabold text-text" numberOfLines={1}>
+                {(technician?.name || ticket.assignedTechnicianName || 'Technician')}
+                {technician?.id ? (
+                  <Text className="text-text-muted font-normal"> — {String(technician.id).slice(0, 8).toUpperCase()}</Text>
+                ) : ticket.assignedTechnicianCode ? (
+                  <Text className="text-text-muted font-normal"> — {ticket.assignedTechnicianCode}</Text>
+                ) : null}
+              </Text>
+              <Text className="text-[11px] text-text-muted ml-2">Technician uploaded device photos</Text>
+            </View>
+            <View className="flex-row -mx-1">
+              {[0, 1, 2].map((i) => (
+                <View key={i} style={{ width: '33.333%' }} className="p-1">
+                  <View
+                    className="rounded-xl items-center justify-center overflow-hidden bg-background"
+                    style={{ aspectRatio: 1, borderWidth: 1, borderStyle: 'dashed', borderColor: '#A5B4FC' }}
+                  >
+                    {technicianPhotos[i] ? (
+                      <Image source={{ uri: technicianPhotos[i] }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                    ) : (
+                      <View className="items-center px-2">
+                        <Camera size={18} color="#94A3B8" />
+                        <Text className="text-[9px] text-text-muted text-center mt-1">Take a photo of the device</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              ))}
+            </View>
           </Card>
         ) : null}
       </ScrollView>
