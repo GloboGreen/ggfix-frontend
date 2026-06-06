@@ -12,62 +12,64 @@ function statusMeta(rawStatus, type) {
   const s = String(rawStatus || '').toUpperCase();
   const sell = type !== 'BUY';
   if (s === 'SOLD' || s === 'COMPLETED') {
-    return { label: sell ? 'Selling Completed' : 'Order Successfully', icon: 'checkmark', bg: '#10B981' };
+    return { short: sell ? 'Sold' : 'Done', bg: '#10B981' };
   }
   if (s === 'CANCELLED' || s === 'CANCELED') {
-    return { label: sell ? 'Cancelled' : 'Order Cancelled', icon: 'close', bg: '#EF4444' };
+    return { short: 'Cancelled', bg: '#EF4444' };
   }
   // ACTIVE / PENDING / DRAFT — listing is live but not yet sold.
-  return { label: sell ? 'Selling — Pending' : 'Order Pending', icon: 'time-outline', bg: '#F59E0B' };
-}
-
-function StatusRow({ status, type, date }) {
-  const meta = statusMeta(status, type);
-  return (
-    <View className="flex-row items-center">
-      <View className="w-5 h-5 rounded-full items-center justify-center mr-2" style={{ backgroundColor: meta.bg }}>
-        <Ionicons name={meta.icon} size={12} color="#fff" />
-      </View>
-      <View className="flex-1">
-        <Text className="font-extrabold text-text text-[13px]">{meta.label}</Text>
-        <Text className="text-text-muted text-[10px] mt-0.5">{date}</Text>
-      </View>
-    </View>
-  );
+  return { short: 'Pending', bg: '#F59E0B' };
 }
 
 function OrderCard({ item, showPrice, onPress }) {
-  const orderId = item.id ? String(item.id).slice(0, 12).toUpperCase().replace(/-/g, '') : '';
+  const orderId = item.id ? String(item.id).slice(0, 10).toUpperCase().replace(/-/g, '') : '';
   const created = item.createdAt ? new Date(item.createdAt) : null;
   const dateLabel = created
-    ? created.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })
+    ? created.toLocaleDateString(undefined, { day: '2-digit', month: 'short' })
     : '';
-  const specs = item.color || item.storageLabel || item.descriptionType || '';
+  const specs = [item.color, item.storageLabel].filter(Boolean).join(' · ');
+  const meta = statusMeta(item.status, item.type);
 
   return (
     <Pressable
       onPress={onPress}
-      className="bg-card rounded-2xl mb-3 p-3 active:opacity-80"
-      style={{ shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 2 }}
+      className="bg-card rounded-xl mb-2 p-2.5 flex-row items-center active:opacity-80"
+      style={{ shadowColor: '#0F172A', shadowOpacity: 0.04, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 1 }}
     >
-      <StatusRow status={item.status} type={item.type} date={dateLabel} />
-      <View className="border-t border-border my-2.5" />
-      <View className="flex-row items-center">
-        <View className="w-[68px] h-[68px] rounded-md overflow-hidden bg-background items-center justify-center mr-3">
-          {item.imageUrl ? (
-            <Image source={{ uri: item.imageUrl }} style={{ width: 68, height: 68 }} resizeMode="cover" />
-          ) : (
-            <Ionicons name="cube-outline" size={26} color="#94A3B8" />
-          )}
+      <View className="w-14 h-14 rounded-lg overflow-hidden bg-background items-center justify-center mr-3">
+        {item.imageUrl ? (
+          <Image source={{ uri: item.imageUrl }} style={{ width: 56, height: 56 }} resizeMode="cover" />
+        ) : (
+          <Ionicons name="cube-outline" size={22} color="#94A3B8" />
+        )}
+      </View>
+
+      <View className="flex-1">
+        <View className="flex-row items-center justify-between mb-0.5">
+          <Text className="text-text-muted text-[10px]" numberOfLines={1}>GGFIX{orderId}</Text>
+          <View
+            className="flex-row items-center px-1.5 py-0.5 rounded-full"
+            style={{ backgroundColor: meta.bg + '1A' }}
+          >
+            <View className="w-1.5 h-1.5 rounded-full mr-1" style={{ backgroundColor: meta.bg }} />
+            <Text style={{ color: meta.bg, fontSize: 9, fontWeight: '800' }}>{meta.short}</Text>
+          </View>
         </View>
-        <View className="flex-1">
-          <Text className="text-text-muted text-[10px]">Order ID : <Text className="text-text font-semibold">GGFIX{orderId}</Text></Text>
-          <Text className="text-text font-extrabold text-[15px] mt-1" numberOfLines={1}>{item.title || 'Item'}</Text>
-          {specs ? <Text className="text-text-muted text-[12px]" numberOfLines={1}>{specs}</Text> : null}
+
+        <Text className="text-text font-extrabold text-[13px]" numberOfLines={1}>
+          {item.title || 'Item'}
+        </Text>
+
+        <View className="flex-row items-center justify-between mt-0.5">
+          <Text className="text-text-muted text-[11px]" numberOfLines={1}>
+            {specs || dateLabel || ''}
+          </Text>
+          {showPrice && item.price != null ? (
+            <Text className="text-text font-extrabold text-[12px] ml-2">
+              ₹{Number(item.price).toLocaleString('en-IN')}
+            </Text>
+          ) : null}
         </View>
-        {showPrice && item.price != null ? (
-          <Text className="text-text font-extrabold text-[14px] ml-2">₹{Number(item.price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
-        ) : null}
       </View>
     </Pressable>
   );
@@ -149,16 +151,16 @@ export default function MarketplaceOrdersScreen({ navigation }) {
         )}
       />
 
-      <View className="flex-row px-4 py-3">
+      <View className="mx-4 mt-3 mb-2 flex-row rounded-full bg-card border border-border p-1">
         {['Buy', 'Sell'].map((t) => {
           const active = tab === t;
           return (
             <Pressable
               key={t}
               onPress={() => setTab(t)}
-              className={`rounded-full px-5 py-2 mr-2 ${active ? 'bg-success' : 'bg-background border border-border'}`}
+              className={`flex-1 items-center justify-center py-1.5 rounded-full ${active ? 'bg-success' : ''}`}
             >
-              <Text className={`text-[12px] font-extrabold ${active ? 'text-white' : 'text-text'}`}>{t}</Text>
+              <Text className={`text-[12px] font-extrabold ${active ? 'text-white' : 'text-text-muted'}`}>{t}</Text>
             </Pressable>
           );
         })}
@@ -174,7 +176,7 @@ export default function MarketplaceOrdersScreen({ navigation }) {
           </Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 24 }}>
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 12, paddingTop: 4, paddingBottom: 20 }}>
           {items.map((item) => (
             <OrderCard
               key={item.id}

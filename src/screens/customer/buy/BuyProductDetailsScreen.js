@@ -27,7 +27,27 @@ const styles = StyleSheet.create({
   shopLine: { fontSize: 13, color: colors.text, marginTop: 4 },
   shopMuted: { fontSize: 12, color: colors.textSecondary, marginTop: 4 },
   bottom: { padding: 12, backgroundColor: '#fff', borderTopColor: colors.border, borderTopWidth: 1 },
+
+  // Device Summary block — mirrors the owner-side MarketplaceListingDetailsScreen.
+  summaryHeading: { color: '#2563EB', fontWeight: '800', fontSize: 14 },
+  summarySection: { color: colors.text, fontWeight: '700', fontSize: 12, marginTop: 10, marginBottom: 2 },
+  summaryItem: { flexDirection: 'row', alignItems: 'flex-start', marginTop: 4 },
+  summaryItemText: { color: colors.text, fontSize: 12, marginLeft: 6, flex: 1 },
+  descTypeLabel: { color: colors.textSecondary, fontSize: 10, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' },
+  descTypeValue: { color: colors.text, fontSize: 13, fontWeight: '700', marginTop: 3 },
 });
+
+function DESCRIPTION_TYPE_LABEL(code) {
+  if (code === 'DETAILED') return 'Detailed Description';
+  if (code === 'SHORT') return 'Short Description';
+  if (code === 'DEAD_SHORT') return 'Dead Phone Short Description';
+  if (code === 'SPARE_PARTS') return 'Spare Parts Listing';
+  return code;
+}
+
+function Check() {
+  return <Ionicons name="checkmark-circle" size={14} color="#16A34A" style={{ marginTop: 1 }} />;
+}
 
 export default function BuyProductDetailsScreen({ route }) {
   const { productId } = route.params || {};
@@ -82,6 +102,17 @@ export default function BuyProductDetailsScreen({ route }) {
   const shopAddress = shop?.address || p.shopAddress;
   const shopPhone = shop?.phone || shop?.mobile || p.shopPhone;
   const shopCity = shop?.city || shop?.locality;
+
+  // Same shape as the owner side reads — the listing carries the seller's
+  // full screening/condition/accessory/warranty answers in a JSON blob.
+  let assessment = {};
+  try { assessment = p.assessmentJson ? JSON.parse(p.assessmentJson) : {}; } catch (_) {}
+  const hasSummary = !!(
+    assessment.screeningAnswers?.length ||
+    assessment.conditions?.length ||
+    assessment.accessories?.length ||
+    assessment.warrantyLabel
+  );
 
   return (
     <View style={styles.container}>
@@ -143,6 +174,62 @@ export default function BuyProductDetailsScreen({ route }) {
               </View>
             ) : null}
           </Card>
+
+          {hasSummary ? (
+            <Card>
+              <Text style={styles.summaryHeading}>Device Summary</Text>
+
+              {assessment.screeningAnswers?.length ? (
+                <>
+                  <Text style={styles.summarySection}>Screening Question</Text>
+                  {assessment.screeningAnswers.map((a, i) => (
+                    <View key={i} style={styles.summaryItem}>
+                      <Check />
+                      <Text style={styles.summaryItemText}>
+                        {[a.answer, a.question].filter(Boolean).join(', ')}
+                      </Text>
+                    </View>
+                  ))}
+                </>
+              ) : null}
+
+              {assessment.conditions?.length ? (
+                <>
+                  <Text style={styles.summarySection}>Screen</Text>
+                  {assessment.conditions.map((c, i) => (
+                    <View key={i} style={styles.summaryItem}>
+                      <Check />
+                      <Text style={styles.summaryItemText}>
+                        {[c.optionLabel, c.groupName].filter(Boolean).join(', ')}
+                      </Text>
+                    </View>
+                  ))}
+                </>
+              ) : null}
+
+              {assessment.accessories?.length ? (
+                <>
+                  <Text style={styles.summarySection}>Accessories</Text>
+                  {assessment.accessories.map((a, i) => (
+                    <View key={i} style={styles.summaryItem}>
+                      <Check />
+                      <Text style={styles.summaryItemText}>{a.label || a.accessoryCode}</Text>
+                    </View>
+                  ))}
+                </>
+              ) : null}
+
+              {assessment.warrantyLabel ? (
+                <>
+                  <Text style={styles.summarySection}>Warranty</Text>
+                  <View style={styles.summaryItem}>
+                    <Check />
+                    <Text style={styles.summaryItemText}>{assessment.warrantyLabel}</Text>
+                  </View>
+                </>
+              ) : null}
+            </Card>
+          ) : null}
 
           {p.description ? (
             <Card>

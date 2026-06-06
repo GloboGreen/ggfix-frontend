@@ -55,7 +55,8 @@ import OwnerKycIntroScreen from '../screens/owner/OwnerKycIntroScreen';
 import OwnerKycUploadScreen from '../screens/owner/OwnerKycUploadScreen';
 import OwnerKycReviewScreen from '../screens/owner/OwnerKycReviewScreen';
 import OwnerKycPendingScreen from '../screens/owner/OwnerKycPendingScreen';
-import OwnerPickupOptionsScreen from '../screens/owner/OwnerPickupOptionsScreen';
+import OwnerKycViewScreen from '../screens/owner/OwnerKycViewScreen';
+import OwnerPickupSlotsScreen from '../screens/owner/OwnerPickupSlotsScreen';
 import OwnerPickupServiceListScreen from '../screens/owner/OwnerPickupServiceListScreen';
 import OwnerPickupServiceDetailScreen from '../screens/owner/OwnerPickupServiceDetailScreen';
 import OwnerEmployeeListScreen from '../screens/owner/OwnerEmployeeListScreen';
@@ -68,6 +69,7 @@ import OwnerEmployeeSalaryReportScreen from '../screens/owner/OwnerEmployeeSalar
 import OwnerEmployeePayslipScreen from '../screens/owner/OwnerEmployeePayslipScreen';
 import OwnerEmployeeShiftDetailsScreen from '../screens/owner/OwnerEmployeeShiftDetailsScreen';
 import OwnerEmployeeWorkingRecordScreen from '../screens/owner/OwnerEmployeeWorkingRecordScreen';
+import OwnerEmployeePickupReportScreen from '../screens/owner/OwnerEmployeePickupReportScreen';
 import OwnerEmployeeAddAdvanceScreen from '../screens/owner/OwnerEmployeeAddAdvanceScreen';
 import OwnerEmployeeApplyLeaveScreen from '../screens/owner/OwnerEmployeeApplyLeaveScreen';
 import OwnerQrCodeScreen from '../screens/owner/OwnerQrCodeScreen';
@@ -240,7 +242,8 @@ export default function OwnerNavigator({ session, onLogout }) {
       <Stack.Screen name="OwnerKycUpload" component={OwnerKycUploadScreen} options={{ title: 'KYC Documents' }} />
       <Stack.Screen name="OwnerKycReview" component={OwnerKycReviewScreen} options={{ title: 'KYC Documents' }} />
       <Stack.Screen name="OwnerKycPending" component={OwnerKycPendingScreen} options={{ title: 'KYC Status' }} />
-      <Stack.Screen name="OwnerPickupOptions" component={OwnerPickupOptionsScreen} options={{ title: 'Service Pickup Options' }} />
+      <Stack.Screen name="OwnerKycView" component={OwnerKycViewScreen} options={{ title: 'KYC Documents' }} />
+      <Stack.Screen name="OwnerPickupSlots" component={OwnerPickupSlotsScreen} options={{ title: 'Service Pickup Options' }} />
       <Stack.Screen name="OwnerPickupServiceList" component={OwnerPickupServiceListScreen} options={{ headerShown: false }} />
       <Stack.Screen name="OwnerPickupServiceDetail" component={OwnerPickupServiceDetailScreen} options={{ headerShown: false }} />
       <Stack.Screen name="OwnerEmployeeList" component={OwnerEmployeeListScreen} options={{ title: 'Employee Management' }} />
@@ -253,6 +256,7 @@ export default function OwnerNavigator({ session, onLogout }) {
       <Stack.Screen name="OwnerEmployeePayslip" component={OwnerEmployeePayslipScreen} options={{ title: 'Pay slip' }} />
       <Stack.Screen name="OwnerEmployeeShiftDetails" component={OwnerEmployeeShiftDetailsScreen} options={{ title: 'Shift details' }} />
       <Stack.Screen name="OwnerEmployeeWorkingRecord" component={OwnerEmployeeWorkingRecordScreen} options={{ title: 'Working record' }} />
+      <Stack.Screen name="OwnerEmployeePickupReport" component={OwnerEmployeePickupReportScreen} options={{ title: 'Pickup report' }} />
       <Stack.Screen name="OwnerEmployeeAddAdvance" component={OwnerEmployeeAddAdvanceScreen} options={{ title: 'Add advance' }} />
       <Stack.Screen name="OwnerEmployeeApplyLeave" component={OwnerEmployeeApplyLeaveScreen} options={{ title: 'Apply for leave' }} />
       <Stack.Screen name="OwnerLeaveRequests" component={OwnerLeaveRequestsScreen} options={{ title: 'Leave requests' }} />

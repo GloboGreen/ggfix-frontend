@@ -3,14 +3,14 @@ import { Button } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import colors from '../theme/colors';
 import BackButton from '../components/BackButton';
-import TechnicianProfileScreen from '../screens/technician/TechnicianProfileScreen';
-import TechnicianDashboardScreen from '../screens/technician/TechnicianDashboardScreen';
-import AssignedTicketsScreen from '../screens/technician/AssignedTicketsScreen';
-import TechnicianTicketDetailScreen from '../screens/technician/TechnicianTicketDetailScreen';
-import UpdateStatusScreen from '../screens/technician/UpdateStatusScreen';
-import AddRepairNotesScreen from '../screens/technician/AddRepairNotesScreen';
-import UploadRepairImagesScreen from '../screens/technician/UploadRepairImagesScreen';
-import TechnicianApplyLeaveScreen from '../screens/technician/TechnicianApplyLeaveScreen';
+import TechnicianProfileScreen from '../screens/owner/technician/TechnicianProfileScreen';
+import TechnicianDashboardScreen from '../screens/owner/technician/TechnicianDashboardScreen';
+import AssignedTicketsScreen from '../screens/owner/technician/AssignedTicketsScreen';
+import TechnicianTicketDetailScreen from '../screens/owner/technician/TechnicianTicketDetailScreen';
+import UpdateStatusScreen from '../screens/owner/technician/UpdateStatusScreen';
+import AddRepairNotesScreen from '../screens/owner/technician/AddRepairNotesScreen';
+import UploadRepairImagesScreen from '../screens/owner/technician/UploadRepairImagesScreen';
+import TechnicianApplyLeaveScreen from '../screens/owner/technician/TechnicianApplyLeaveScreen';
 
 const Stack = createNativeStackNavigator();
 

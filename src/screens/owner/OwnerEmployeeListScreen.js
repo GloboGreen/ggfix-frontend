@@ -100,18 +100,27 @@ export default function OwnerEmployeeListScreen({ navigation, route }) {
     );
   }
 
+  const activeCount = visibleList.filter((e) => e.isAvailable !== false).length;
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.headerRow}>
         <View style={styles.sectionTitleRow}>
-          <Ionicons name="people" size={20} color="#111827" />
+          <Ionicons name="people" size={18} color="#111827" />
           <Text style={styles.sectionTitle}>
             {isPickupPicker ? 'Select Pickup Person' : 'All Employees'}
           </Text>
+          {!isPickupPicker && visibleList.length > 0 && (
+            <View style={styles.countPill}>
+              <Text style={styles.countPillText}>
+                {activeCount}/{visibleList.length}
+              </Text>
+            </View>
+          )}
         </View>
         {isPickupPicker ? null : (
-          <TouchableOpacity style={styles.addStaffBtn} onPress={goAddStaff}>
-            <Ionicons name="person-add" size={18} color="#FFFFFF" />
+          <TouchableOpacity style={styles.addStaffBtn} onPress={goAddStaff} activeOpacity={0.85}>
+            <Ionicons name="person-add" size={14} color="#FFFFFF" />
             <Text style={styles.addStaffText}>Add Staff</Text>
           </TouchableOpacity>
         )}
@@ -124,63 +133,75 @@ export default function OwnerEmployeeListScreen({ navigation, route }) {
           <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} />
         }
       >
-        {visibleList.map((e) => (
-          <View key={e.id} style={styles.card}>
+        {visibleList.map((e) => {
+          const isActive = e.isAvailable !== false;
+          const initial = (e.name || '?').trim().charAt(0).toUpperCase();
+          const role = e.roleLabel || 'Technician';
+          const isPickup = role.toLowerCase() === PICKUP_ROLE.toLowerCase();
+          return (
             <TouchableOpacity
-              style={styles.cardMain}
+              key={e.id}
+              style={[styles.card, !isActive && styles.cardInactive]}
               onPress={() =>
                 isPickupPicker
                   ? handlePickPickupPerson(e)
                   : navigation.navigate('OwnerEmployeeDetail', { employee: e })
               }
-              activeOpacity={0.7}
-              disabled={isPickupPicker && (assigning !== null || e.isAvailable === false)}
+              activeOpacity={0.75}
+              disabled={isPickupPicker && (assigning !== null || !isActive)}
             >
-              <View style={styles.avatarWrap}>
-                <View style={styles.avatar} />
+              <View style={[styles.avatar, isActive ? styles.avatarActive : styles.avatarInactive]}>
+                <Text style={styles.avatarInitial}>{initial}</Text>
+                <View style={[styles.avatarDot, isActive && styles.avatarDotActive]} />
               </View>
+
               <View style={styles.meta}>
-                <Text style={styles.name}>{e.name || '—'}</Text>
-                <Text style={styles.phone}>{e.phone || e.email || '—'}</Text>
-                <Text style={styles.role}>{e.roleLabel || 'Technician'}</Text>
+                <Text style={styles.name} numberOfLines={1}>
+                  {e.name || '—'}
+                </Text>
+                <Text style={styles.subtitle} numberOfLines={1}>
+                  {e.phone || e.email || '—'}
+                </Text>
+                <View style={[styles.roleChip, isPickup && styles.roleChipPickup]}>
+                  <Text style={[styles.roleChipText, isPickup && styles.roleChipTextPickup]}>
+                    {role}
+                  </Text>
+                </View>
               </View>
+
               {isPickupPicker ? (
                 <View style={styles.rightRow}>
                   {assigning === e.id ? (
                     <ActivityIndicator size="small" color="#3B4FD7" />
                   ) : (
-                    <Ionicons name="chevron-forward" size={20} color="#3B4FD7" />
+                    <Ionicons name="chevron-forward" size={18} color="#3B4FD7" />
                   )}
                 </View>
               ) : (
                 <View style={styles.rightRow}>
-                  <View style={styles.statusRow}>
-                    <View style={[styles.statusDot, e.isAvailable !== false && styles.statusDotActive]} />
-                    <Text style={[styles.statusText, e.isAvailable !== false && styles.statusTextActive]}>
-                      {e.isAvailable !== false ? 'Active' : 'Inactive'}
-                    </Text>
-                  </View>
                   {toggling === e.id ? (
-                    <ActivityIndicator size="small" color="#22C55E" />
+                    <ActivityIndicator size="small" color="#22C55E" style={styles.toggle} />
                   ) : (
                     <Switch
-                      value={e.isAvailable !== false}
+                      style={styles.toggle}
+                      value={isActive}
                       onValueChange={(v) => onToggleActive(e, v)}
                       trackColor={{ false: '#D1D5DB', true: '#86EFAC' }}
-                      thumbColor={e.isAvailable !== false ? '#22C55E' : '#9CA3AF'}
+                      thumbColor={isActive ? '#22C55E' : '#9CA3AF'}
                     />
                   )}
                   <TouchableOpacity
                     style={styles.editBtn}
                     onPress={() => navigation.navigate('OwnerEmployeeDetail', { employee: e })}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
-                    <Ionicons name="open-outline" size={18} color="#6B7280" />
+                    <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
                   </TouchableOpacity>
                 </View>
               )}
             </TouchableOpacity>
-          </View>
-        ))}
+          );
+        })}
         {visibleList.length === 0 && (
           <Text style={styles.empty}>
             {isPickupPicker
@@ -200,63 +221,88 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
   },
-  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#111827' },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  sectionTitle: { fontSize: 15, fontWeight: '700', color: '#111827' },
+  countPill: {
+    marginLeft: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 999,
+    backgroundColor: '#EEF2FF',
+  },
+  countPillText: { fontSize: 11, fontWeight: '600', color: '#3B4FD7' },
   addStaffBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#3B4FD7',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: 999,
-    gap: 6,
+    gap: 4,
   },
-  addStaffText: { fontSize: 14, fontWeight: '600', color: '#FFFFFF' },
+  addStaffText: { fontSize: 12, fontWeight: '600', color: '#FFFFFF' },
   scroll: { flex: 1 },
-  content: { padding: 16, paddingBottom: 32 },
+  content: { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 24 },
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    marginBottom: 10,
-    overflow: 'hidden',
-  },
-  cardMain: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    marginBottom: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
-  avatarWrap: { marginRight: 12 },
+  cardInactive: { opacity: 0.72 },
   avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#E5E7EB',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
   },
-  meta: { flex: 1 },
-  name: { fontSize: 15, fontWeight: '700', color: '#111827' },
-  phone: { fontSize: 12, color: '#6B7280', marginTop: 2 },
-  role: { fontSize: 12, color: '#4B5563', marginTop: 2 },
+  avatarActive: { backgroundColor: '#EEF2FF' },
+  avatarInactive: { backgroundColor: '#F3F4F6' },
+  avatarInitial: { fontSize: 14, fontWeight: '700', color: '#3B4FD7' },
+  avatarDot: {
+    position: 'absolute',
+    right: -1,
+    bottom: -1,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#9CA3AF',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  avatarDotActive: { backgroundColor: '#22C55E' },
+  meta: { flex: 1, minWidth: 0 },
+  name: { fontSize: 14, fontWeight: '700', color: '#111827' },
+  subtitle: { fontSize: 11, color: '#6B7280', marginTop: 1 },
+  roleChip: {
+    alignSelf: 'flex-start',
+    marginTop: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+    backgroundColor: '#F3F4F6',
+  },
+  roleChipPickup: { backgroundColor: '#FEF3C7' },
+  roleChipText: { fontSize: 10, fontWeight: '600', color: '#4B5563' },
+  roleChipTextPickup: { color: '#92400E' },
   rightRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 2,
+    marginLeft: 6,
   },
-  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#9CA3AF',
-  },
-  statusDotActive: { backgroundColor: '#22C55E' },
-  statusText: { fontSize: 12, color: '#9CA3AF' },
-  statusTextActive: { color: '#22C55E' },
+  toggle: { transform: [{ scaleX: 0.75 }, { scaleY: 0.75 }] },
   editBtn: { padding: 4 },
-  empty: { textAlign: 'center', color: '#6B7280', marginTop: 24 },
+  empty: { textAlign: 'center', color: '#6B7280', marginTop: 24, fontSize: 13 },
 });

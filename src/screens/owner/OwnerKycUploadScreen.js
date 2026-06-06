@@ -1,57 +1,287 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+  Platform,
+  Image,
+  ActivityIndicator,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import { useSelector } from 'react-redux';
+import { CommonActions } from '@react-navigation/native';
+import { uploadMedia } from '../../api/masterData';
+import { saveShopKycDocuments } from '../../api/shops';
+import { selectShopId } from '../../store/authSlice';
 
 const DOCS = [
-  'Aadhar Card Front',
-  'Aadhar Card Back',
-  'PAN Card',
-  'GST Certificate',
-  'Udayam Certificate',
+  { key: 'aadharFront', title: 'Aadhar Card Front', required: true,  group: 'identity' },
+  { key: 'aadharBack',  title: 'Aadhar Card Back',  required: true,  group: 'identity' },
+  { key: 'pan',         title: 'PAN Card',          required: true,  group: 'tax' },
+  { key: 'gst',         title: 'GST Certificate',   required: false, group: 'business' },
+  { key: 'udyam',       title: 'Udyam Certificate', required: false, group: 'business' },
 ];
 
-export default function OwnerKycUploadScreen({ navigation }) {
-  const [uploaded, setUploaded] = useState(
-    Object.fromEntries(DOCS.map((d) => [d, false])),
-  );
+const STEPS = [
+  { key: 'identity', label: 'Identity' },
+  { key: 'tax',      label: 'Tax' },
+  { key: 'business', label: 'Business' },
+];
 
-  const toggle = (name) =>
-    setUploaded((prev) => ({ ...prev, [name]: !prev[name] }));
+export default function OwnerKycUploadScreen({ navigation, route }) {
+  // When entered from KYC View → Edit, route.params.existing is a map of
+  // docType → existing server doc. We pre-populate `files` with placeholder
+  // entries (just a URI + `__fromServer` flag) so the previews show, and we
+  // skip re-uploading those URLs on submit.
+  const existing = route?.params?.existing || {};
+  const initialFiles = Object.fromEntries(
+    Object.entries(existing).map(([key, doc]) => [
+      key,
+      { uri: doc.url, __fromServer: true, __serverUrl: doc.url },
+    ])
+  );
+  const [files, setFiles] = useState(initialFiles);
+  const [submitting, setSubmitting] = useState(false);
+  const shopId = useSelector(selectShopId);
+
+  const pickImage = async (key, fromCamera = false) => {
+    try {
+      const perm = fromCamera
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Permission needed', `Please allow ${fromCamera ? 'camera' : 'photo library'} access to upload.`);
+        return;
+      }
+      const opts = { quality: 0.8, mediaTypes: ['images'] };
+      const result = fromCamera
+        ? await ImagePicker.launchCameraAsync(opts)
+        : await ImagePicker.launchImageLibraryAsync(opts);
+      if (result.canceled || !result.assets?.[0]?.uri) return;
+      setFiles((prev) => ({ ...prev, [key]: result.assets[0] }));
+    } catch (e) {
+      Alert.alert('Could not pick image', e?.message || 'Please try again.');
+    }
+  };
+
+  const promptUpload = (key) => {
+    if (Platform.OS === 'web') {
+      pickImage(key, false);
+      return;
+    }
+    Alert.alert('Add document', '', [
+      { text: 'Take Photo', onPress: () => pickImage(key, true) },
+      { text: 'Choose from Library', onPress: () => pickImage(key, false) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const remove = (key) => setFiles((prev) => {
+    const next = { ...prev };
+    delete next[key];
+    return next;
+  });
+
+  // Submit needs: both Aadhar sides, PAN, AND at least one of GST / Udyam.
+  // GST and Udyam are individually "optional" but together they're required —
+  // a shop must prove business registration via one of them.
+  const identityDone = !!files.aadharFront && !!files.aadharBack;
+  const taxDone = !!files.pan;
+  const businessDone = !!files.gst || !!files.udyam;
+  const allRequiredDone = identityDone && taxDone && businessDone;
+  const submitReady = allRequiredDone;
+  const stepState = { identity: identityDone, tax: taxDone, business: businessDone };
+
+  // Submit flow (no intermediate review screen — go straight back to My Account):
+  //   1. Verify all required docs are picked.
+  //   2. Upload each freshly-picked file to /media/upload (master-service).
+  //      Pre-existing server URLs (from Edit mode) are passed through.
+  //   3. POST the resulting [{ docType, title, url, required }] list to
+  //      shop-service /shops/{shopId}/kyc-documents (batch upsert).
+  //   4. Reset the navigation stack so the user lands on the My Account tab
+  //      with no path back to the KYC stack.
+  const onProceed = async () => {
+    if (!allRequiredDone) {
+      const missing = [];
+      if (!files.aadharFront) missing.push('Aadhar Card Front');
+      if (!files.aadharBack)  missing.push('Aadhar Card Back');
+      if (!files.pan)         missing.push('PAN Card');
+      if (!businessDone)      missing.push('GST Certificate or Udyam Certificate');
+      Alert.alert('Required documents missing', `Please upload: ${missing.join(', ')}`);
+      return;
+    }
+    if (!shopId) {
+      Alert.alert('Session expired', 'Please log in again to submit your KYC.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const payload = [];
+      const failedTitles = [];
+      for (const doc of DOCS) {
+        const asset = files[doc.key];
+        if (!asset?.uri) continue;
+        // Pre-existing server doc — pass the URL through, don't re-upload.
+        if (asset.__fromServer && asset.__serverUrl) {
+          payload.push({ docType: doc.key, title: doc.title, url: asset.__serverUrl, required: doc.required });
+          continue;
+        }
+        let url = asset.uri;
+        try {
+          const hostedUrl = await uploadMedia(asset, 'shop-kyc');
+          if (hostedUrl) url = hostedUrl;
+          else failedTitles.push(doc.title);
+        } catch (uploadErr) {
+          // eslint-disable-next-line no-console
+          console.warn(`KYC upload failed for ${doc.title}:`, uploadErr?.message);
+          failedTitles.push(doc.title);
+        }
+        payload.push({ docType: doc.key, title: doc.title, url, required: doc.required });
+      }
+
+      await saveShopKycDocuments(shopId, payload);
+
+      const successMessage = failedTitles.length > 0
+        ? `KYC submitted. Some files saved with local copies and will retry: ${failedTitles.join(', ')}.`
+        : 'KYC documents submitted successfully. Admin will review them shortly.';
+
+      Alert.alert('Submitted', successMessage, [
+        {
+          text: 'OK',
+          onPress: () => {
+            // Land on the View screen (with Edit button) so the user sees what
+            // they just uploaded; MyAccount sits underneath so back returns there
+            // instead of looping into the upload stack.
+            navigation.dispatch(
+              CommonActions.reset({
+                index: 1,
+                routes: [
+                  { name: 'OwnerTabs', state: { routes: [{ name: 'MyAccount' }] } },
+                  { name: 'OwnerKycView', params: { fromSubmit: true } },
+                ],
+              })
+            );
+          },
+        },
+      ]);
+    } catch (e) {
+      Alert.alert('Submit failed', e?.message || 'Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-        {DOCS.map((name) => {
-          const isUploaded = uploaded[name];
-          return (
-            <TouchableOpacity
-              key={name}
-              style={[styles.card, isUploaded && styles.cardUploaded]}
-              onPress={() => toggle(name)}
-            >
-              <View style={styles.row}>
-                <Ionicons
-                  name={isUploaded ? 'cloud-done-outline' : 'cloud-upload-outline'}
-                  size={24}
-                  color={isUploaded ? '#16A34A' : '#4B5563'}
-                />
-                <View style={{ marginLeft: 8, flex: 1 }}>
-                  <Text style={styles.title}>{name}</Text>
-                  <Text style={styles.desc}>
-                    Upload your {name} image. Maximum file size: 5 MB.
-                  </Text>
+        {/* Step progress */}
+        <View style={styles.stepperWrap}>
+          {STEPS.map((s, idx) => {
+            const done = stepState[s.key];
+            const isLast = idx === STEPS.length - 1;
+            return (
+              <React.Fragment key={s.key}>
+                <View style={styles.stepCol}>
+                  <View style={[styles.stepDot, done ? styles.stepDotDone : styles.stepDotIdle]}>
+                    {done ? (
+                      <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+                    ) : (
+                      <View style={styles.stepDotInner} />
+                    )}
+                  </View>
+                  <Text style={[styles.stepLabel, done && styles.stepLabelDone]}>{s.label}</Text>
                 </View>
-              </View>
-            </TouchableOpacity>
-          );
-        })}
+                {!isLast && (
+                  <View style={[styles.stepLine, done && styles.stepLineDone]} />
+                )}
+              </React.Fragment>
+            );
+          })}
+        </View>
 
+        {/* Document grid */}
+        <View style={styles.grid}>
+          {DOCS.map((doc) => {
+            const file = files[doc.key];
+            const isUploaded = !!file;
+            return (
+              <View key={doc.key} style={styles.cardOuter}>
+                {/* Header strip */}
+                <View style={styles.cardHeader}>
+                  <View style={styles.cardHeaderIcon}>
+                    <Ionicons name="person-circle-outline" size={16} color="#374151" />
+                  </View>
+                  <Text style={styles.cardHeaderTitle} numberOfLines={1}>{doc.title}</Text>
+                  {doc.required && <Text style={styles.requiredStar}>*</Text>}
+                </View>
+
+                {/* Body — upload area or preview */}
+                <TouchableOpacity
+                  style={[styles.dropZone, isUploaded && styles.dropZoneUploaded]}
+                  onPress={() => promptUpload(doc.key)}
+                  activeOpacity={0.85}
+                >
+                  {isUploaded ? (
+                    <>
+                      <Image source={{ uri: file.uri }} style={styles.preview} />
+                      <TouchableOpacity
+                        onPress={() => remove(doc.key)}
+                        style={styles.removeBadge}
+                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                      >
+                        <Ionicons name="close" size={11} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <>
+                      <View style={styles.uploadIconCircle}>
+                        <Ionicons name="cloud-upload" size={16} color="#FFFFFF" />
+                      </View>
+                      <Text style={styles.dropZoneTitle}>Upload your {doc.title.split(' ')[0]}</Text>
+                      <Text style={styles.dropZoneSub}>JPEG, PNG and PDF formats</Text>
+                      <Text style={styles.dropZoneSub}>Maximum file size: 5 MB.</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            );
+          })}
+        </View>
+
+        {/* Business-doc rule hint — shown until at least one is uploaded */}
+        {!businessDone && (
+          <View style={styles.ruleHint}>
+            <Ionicons name="information-circle" size={13} color="#92400E" />
+            <Text style={styles.ruleHintText}>
+              Upload <Text style={styles.ruleHintBold}>GST Certificate</Text> or{' '}
+              <Text style={styles.ruleHintBold}>Udyam Certificate</Text> (at least one required).
+            </Text>
+          </View>
+        )}
+
+        {/* Action button — PROCEED before all required done, SUBMIT after */}
         <TouchableOpacity
-          style={styles.button}
-          onPress={() => navigation.navigate('OwnerKycReview')}
+          style={[styles.actionBtn, submitReady ? styles.actionBtnSubmit : styles.actionBtnProceed]}
+          onPress={onProceed}
+          activeOpacity={0.9}
+          disabled={submitting}
         >
-          <Text style={styles.buttonText}>PROCEED</Text>
+          {submitting ? (
+            <>
+              <ActivityIndicator size="small" color="#FFFFFF" />
+              <Text style={styles.actionBtnText}>UPLOADING…</Text>
+            </>
+          ) : (
+            <>
+              <Text style={styles.actionBtnText}>{submitReady ? 'SUBMIT' : 'PROCEED'}</Text>
+              <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+            </>
+          )}
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -59,30 +289,135 @@ export default function OwnerKycUploadScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#E5ECFF' },
+  safe: { flex: 1, backgroundColor: '#F4F1FB' },
   scroll: { flex: 1 },
-  content: { padding: 16, paddingBottom: 32 },
-  card: {
+  content: { padding: 14, paddingBottom: 32 },
+
+  // Stepper
+  stepperWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    marginBottom: 14,
+  },
+  stepCol: { alignItems: 'center', width: 60 },
+  stepDot: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+  },
+  stepDotIdle: { borderColor: '#3B4FD7', backgroundColor: '#FFFFFF' },
+  stepDotInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#FFFFFF' },
+  stepDotDone: { borderColor: '#22C55E', backgroundColor: '#22C55E' },
+  stepLabel: { fontSize: 9, color: '#6B7280', fontWeight: '600', marginTop: 3 },
+  stepLabelDone: { color: '#15803D' },
+  stepLine: {
+    flex: 1,
+    height: 2,
+    backgroundColor: '#D1D5DB',
+    marginTop: -12, // align with dot centers
+  },
+  stepLineDone: { backgroundColor: '#22C55E' },
+
+  // Grid
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  cardOuter: {
+    width: '48%',
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 12,
-    marginBottom: 10,
+    borderRadius: 10,
+    padding: 8,
+    marginBottom: 6,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginBottom: 8,
+  },
+  cardHeaderIcon: { width: 18, alignItems: 'center' },
+  cardHeaderTitle: { flex: 1, fontSize: 11, fontWeight: '700', color: '#111827' },
+  requiredStar: { color: '#DC2626', fontWeight: '800', fontSize: 12 },
+
+  dropZone: {
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  cardUploaded: {
-    borderColor: '#16A34A',
-  },
-  row: { flexDirection: 'row', alignItems: 'center' },
-  title: { fontSize: 13, fontWeight: '700', color: '#111827' },
-  desc: { fontSize: 11, color: '#4B5563', marginTop: 2 },
-  button: {
-    marginTop: 8,
-    backgroundColor: '#111827',
-    borderRadius: 999,
+    borderStyle: 'dashed',
+    borderColor: '#9CA3AF',
+    borderRadius: 8,
+    paddingHorizontal: 8,
     paddingVertical: 14,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 110,
+    position: 'relative',
+    overflow: 'hidden',
   },
-  buttonText: { fontSize: 15, fontWeight: '600', color: '#FFFFFF' },
-});
+  dropZoneUploaded: { borderColor: '#22C55E', padding: 0, backgroundColor: '#FFFFFF' },
 
+  uploadIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#3B4FD7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  dropZoneTitle: { fontSize: 10, color: '#374151', fontWeight: '700', textAlign: 'center' },
+  dropZoneSub: { fontSize: 9, color: '#6B7280', textAlign: 'center', marginTop: 1 },
+
+  preview: {
+    width: '100%',
+    height: 110,
+    resizeMode: 'cover',
+    borderRadius: 6,
+  },
+  removeBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  ruleHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FEF3C7',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginTop: 6,
+  },
+  ruleHintText: { flex: 1, fontSize: 11, color: '#92400E' },
+  ruleHintBold: { fontWeight: '800' },
+
+  actionBtn: {
+    marginTop: 14,
+    paddingVertical: 13,
+    borderRadius: 999,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  actionBtnProceed: { backgroundColor: '#1E3A8A' },
+  actionBtnSubmit: { backgroundColor: '#22C55E' },
+  actionBtnText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800', letterSpacing: 1 },
+});

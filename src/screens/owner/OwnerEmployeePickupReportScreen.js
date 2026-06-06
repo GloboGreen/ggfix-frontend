@@ -17,23 +17,32 @@ const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
-const FILTERS = ['All', 'Completed', 'In Process', 'Pending'];
+const FILTERS = ['All', 'Completed', 'In Progress', 'Assigned'];
 
-// Map raw booking.status / latest-event status into a UI bucket the cards key off.
+// Bucket pickup statuses for an at-a-glance summary.
+// Buckets:
+//   ASSIGNED   — assigned to this pickup person, not yet picked up
+//   IN_PROGRESS — picked up, in transit / at shop processing
+//   COMPLETED  — pickup delivered + repair flow finished
 function bucketize(status) {
   const s = (status || '').toUpperCase();
-  if (s.includes('COMPLETE') || s === 'DELIVERED' || s === 'CLOSED') return 'COMPLETED';
-  if (s.includes('PENDING') || s.includes('AWAIT') || s === 'SPARE_ORDERED') return 'PENDING';
   if (
-    s.includes('IN_SERVICE')
-    || s.includes('IN_PROCESS')
+    s === 'PICKUP_COMPLETED'
+    || s === 'DELIVERED'
+    || s === 'COMPLETED'
+    || s === 'CLOSED'
+    || s.includes('REPAIR_COMPLETED')
+  ) return 'COMPLETED';
+  if (
+    s === 'PICKED_UP'
+    || s === 'IN_TRANSIT'
+    || s === 'AT_SHOP'
+    || s === 'IN_SERVICE'
+    || s === 'PICKUP_IN_PROGRESS'
     || s.includes('STARTED')
-    || s === 'SERVICE_ACCEPTED'
-    || s === 'ASSIGNED'
-    || s === 'CONFIRMED'
-    || s === 'PICKUP_SCHEDULED'
-  ) return 'IN_PROCESS';
-  return 'IN_PROCESS';
+    || s.includes('IN_PROCESS')
+  ) return 'IN_PROGRESS';
+  return 'ASSIGNED';
 }
 
 function formatDate(d) {
@@ -48,23 +57,22 @@ function formatDateTime(instant) {
   });
 }
 
-// Compose a "device" line out of the brand/model/RAM/storage fields the booking carries.
-function deviceLine(b) {
-  const parts = [];
-  if (b.modelName) parts.push(b.modelName);
-  else if (b.brandName) parts.push(b.brandName);
-  if (b.ramLabel || b.storageLabel) {
-    parts.push(`${b.ramLabel || ''}${b.ramLabel && b.storageLabel ? ' / ' : ''}${b.storageLabel || ''}`.trim());
-  }
-  if (b.issueSummary) parts.push(b.issueSummary);
-  return parts.join(' - ') || 'Repair booking';
-}
-
 function trackingId(b) {
   return b.trackingId || b.ticketCode || `CSPEN${String(b.id || '').replace(/[^0-9]/g, '').slice(0, 8) || '——'}`;
 }
 
-export default function OwnerEmployeeWorkingRecordScreen({ route, navigation }) {
+// Build a short address line: 1st 30 chars of the pickup address or fallback.
+function addressLine(b) {
+  return b.pickupAddressText || b.pickupAddressLabel || b.address || '—';
+}
+
+function customerLine(b) {
+  const name = b.customerName || '—';
+  const mobile = b.customerMobile ? ` • ${b.customerMobile}` : '';
+  return `${name}${mobile}`;
+}
+
+export default function OwnerEmployeePickupReportScreen({ route, navigation }) {
   const employee = route.params?.employee;
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -89,24 +97,18 @@ export default function OwnerEmployeeWorkingRecordScreen({ route, navigation }) 
 
   React.useEffect(() => { load(); }, [load]);
 
-  // Keep only bookings actually assigned to this employee. The order-service
-  // currently exposes `assignedPickupPersonId` (UUID) for pickup persons and
-  // a denormalized `technicianName` string for service technicians, so we
-  // match on either path. (Adding a proper `assignedTechnicianId` column on
-  // repair_bookings would let this become a server-side filter.)
+  // Filter to bookings where THIS employee is the assigned pickup person.
+  // Uses the proper UUID column on repair_bookings (no name fallback needed,
+  // unlike the technician-side filter — assignedPickupPersonId is reliable).
   const mineAll = useMemo(() => {
     if (!employee?.id) return [];
-    return list.filter((b) => {
-      if (b.assignedPickupPersonId === employee.id) return true;
-      if (b.technicianName && employee.name && b.technicianName.trim() === employee.name.trim()) return true;
-      return false;
-    });
-  }, [list, employee?.id, employee?.name]);
+    return list.filter((b) => b.assignedPickupPersonId === employee.id);
+  }, [list, employee?.id]);
 
-  // Scope to the picked month so the stats only reflect tasks created/updated then.
+  // Scope to the picked month so the counts reflect "this month's pickups".
   const mine = useMemo(() => {
     return mineAll.filter((b) => {
-      const t = b.updatedAt || b.createdAt;
+      const t = b.pickupDate || b.updatedAt || b.createdAt;
       if (!t) return true;
       const d = new Date(t);
       return d.getFullYear() === year && d.getMonth() + 1 === month;
@@ -114,33 +116,33 @@ export default function OwnerEmployeeWorkingRecordScreen({ route, navigation }) 
   }, [mineAll, year, month]);
 
   const counts = useMemo(() => {
-    let pending = 0, inProcess = 0, completed = 0;
+    let assigned = 0, inProgress = 0, completed = 0;
     mine.forEach((b) => {
       const bk = bucketize(b.status);
-      if (bk === 'PENDING') pending += 1;
+      if (bk === 'ASSIGNED') assigned += 1;
       else if (bk === 'COMPLETED') completed += 1;
-      else inProcess += 1;
+      else inProgress += 1;
     });
-    return { inProcess, pending, completed, total: mine.length };
+    return { assigned, inProgress, completed, total: mine.length };
   }, [mine]);
 
   const sortedDesc = useMemo(() => {
     return [...mine].sort((a, b) => {
-      const at = new Date(a.updatedAt || a.createdAt || 0).getTime();
-      const bt = new Date(b.updatedAt || b.createdAt || 0).getTime();
+      const at = new Date(a.pickupDate || a.updatedAt || a.createdAt || 0).getTime();
+      const bt = new Date(b.pickupDate || b.updatedAt || b.createdAt || 0).getTime();
       return bt - at;
     });
   }, [mine]);
 
-  const recentPending = sortedDesc.find((b) => bucketize(b.status) === 'PENDING');
-  const recentInProcess = sortedDesc.find((b) => bucketize(b.status) === 'IN_PROCESS');
+  const recentAssigned = sortedDesc.find((b) => bucketize(b.status) === 'ASSIGNED');
+  const recentInProgress = sortedDesc.find((b) => bucketize(b.status) === 'IN_PROGRESS');
 
-  const previousCompleted = sortedDesc.filter((b) => {
+  const filteredList = sortedDesc.filter((b) => {
     const bk = bucketize(b.status);
     if (filter === 'All') return true;
     if (filter === 'Completed') return bk === 'COMPLETED';
-    if (filter === 'In Process') return bk === 'IN_PROCESS';
-    if (filter === 'Pending') return bk === 'PENDING';
+    if (filter === 'In Progress') return bk === 'IN_PROGRESS';
+    if (filter === 'Assigned') return bk === 'ASSIGNED';
     return false;
   });
 
@@ -189,23 +191,23 @@ export default function OwnerEmployeeWorkingRecordScreen({ route, navigation }) 
 
           <View style={styles.statTilesRow}>
             <StatTile
-              value={String(counts.inProcess).padStart(2, '0')}
-              label="In Process"
-              hint="Active"
-              icon="sync"
+              value={String(counts.assigned).padStart(2, '0')}
+              label="Assigned"
+              hint="Scheduled"
+              icon="bookmark"
               bg="#3B4FD7"
             />
             <StatTile
-              value={String(counts.pending).padStart(2, '0')}
-              label="Pending"
-              hint="Waiting"
-              icon="alert-circle"
-              bg="#EF4444"
+              value={String(counts.inProgress).padStart(2, '0')}
+              label="In Progress"
+              hint="On route"
+              icon="car"
+              bg="#F97316"
             />
             <StatTile
               value={String(counts.completed).padStart(3, '0')}
               label="Completed"
-              hint="Finished"
+              hint="Delivered"
               icon="checkmark-done"
               bg="#22C55E"
             />
@@ -223,36 +225,36 @@ export default function OwnerEmployeeWorkingRecordScreen({ route, navigation }) 
           <ActivityIndicator size="small" color="#3B4FD7" style={{ marginVertical: 20 }} />
         )}
 
-        {/* Recent Pending */}
-        <Text style={styles.sectionHeader}>Recent Pending</Text>
-        {recentPending ? (
-          <TaskCard
-            booking={recentPending}
-            bucket="PENDING"
-            onPress={() => openBooking(recentPending)}
+        {/* Recent Assigned */}
+        <Text style={styles.sectionHeader}>Recent Assigned</Text>
+        {recentAssigned ? (
+          <PickupCard
+            booking={recentAssigned}
+            bucket="ASSIGNED"
+            onPress={() => openBooking(recentAssigned)}
             onRefresh={() => load(true)}
             refreshing={refreshing}
           />
         ) : (
-          <Text style={styles.empty}>No pending tasks.</Text>
+          <Text style={styles.empty}>No new pickup assignments.</Text>
         )}
 
-        {/* In Process */}
-        <Text style={styles.sectionHeader}>In Process</Text>
-        {recentInProcess ? (
-          <TaskCard
-            booking={recentInProcess}
-            bucket="IN_PROCESS"
-            onPress={() => openBooking(recentInProcess)}
+        {/* In Progress */}
+        <Text style={styles.sectionHeader}>In Progress</Text>
+        {recentInProgress ? (
+          <PickupCard
+            booking={recentInProgress}
+            bucket="IN_PROGRESS"
+            onPress={() => openBooking(recentInProgress)}
             onRefresh={() => load(true)}
             refreshing={refreshing}
           />
         ) : (
-          <Text style={styles.empty}>No tasks in progress.</Text>
+          <Text style={styles.empty}>No pickups in progress.</Text>
         )}
 
-        {/* Previous Completed (with filter chips) */}
-        <Text style={styles.sectionHeader}>Previous Completed</Text>
+        {/* Previous (with filter chips) */}
+        <Text style={styles.sectionHeader}>Previous Pickups</Text>
         <View style={styles.filterRow}>
           {FILTERS.map((f) => (
             <TouchableOpacity
@@ -267,11 +269,11 @@ export default function OwnerEmployeeWorkingRecordScreen({ route, navigation }) 
             </TouchableOpacity>
           ))}
         </View>
-        {previousCompleted.length === 0 ? (
-          <Text style={styles.empty}>No tasks found.</Text>
+        {filteredList.length === 0 ? (
+          <Text style={styles.empty}>No pickups found.</Text>
         ) : (
-          previousCompleted.map((b) => (
-            <TaskCard
+          filteredList.map((b) => (
+            <PickupCard
               key={b.id}
               booking={b}
               bucket={bucketize(b.status)}
@@ -299,75 +301,72 @@ function StatTile({ value, label, hint, icon, bg }) {
   );
 }
 
-function TaskCard({ booking, bucket, onPress, onRefresh, refreshing }) {
-  const isPending = bucket === 'PENDING';
-  const isInProcess = bucket === 'IN_PROCESS';
+function PickupCard({ booking, bucket, onPress, onRefresh, refreshing }) {
+  const isAssigned = bucket === 'ASSIGNED';
+  const isInProgress = bucket === 'IN_PROGRESS';
   const isCompleted = bucket === 'COMPLETED';
 
   const stepLine =
-    isPending ? 'Spare part has been ordered. Service is Pending'
-      : isInProcess ? 'Technician Work Started'
-        : 'Technician Work Completed';
+    isAssigned ? 'Pickup Scheduled — awaiting collection'
+      : isInProgress ? 'In Transit — heading to shop'
+        : 'Pickup Completed — delivered to shop';
   const stepColor =
-    isPending ? '#DC2626'
-      : isInProcess ? '#3B4FD7'
+    isAssigned ? '#3B4FD7'
+      : isInProgress ? '#F97316'
         : '#15803D';
 
+  const slot =
+    booking.pickupSlotStart && booking.pickupSlotEnd
+      ? `${String(booking.pickupSlotStart).slice(0, 5)} – ${String(booking.pickupSlotEnd).slice(0, 5)}`
+      : null;
+  const datePart = booking.pickupDate ? formatDate(booking.pickupDate) : formatDate(booking.createdAt);
   const footerLine =
-    isPending ? `Pending On ${formatDateTime(booking.updatedAt || booking.createdAt)}`
-      : isInProcess ? `In Service Process On ${formatDateTime(booking.updatedAt || booking.createdAt)}`
-        : `Completed On ${formatDateTime(booking.updatedAt || booking.createdAt)}`;
+    isAssigned ? `Pickup on ${datePart}${slot ? ` (${slot})` : ''}`
+      : isInProgress ? `Picked up on ${formatDateTime(booking.updatedAt || booking.createdAt)}`
+        : `Delivered on ${formatDateTime(booking.updatedAt || booking.createdAt)}`;
 
   return (
-    <TouchableOpacity style={styles.taskCard} onPress={onPress} activeOpacity={0.85}>
-      <View style={styles.taskAccent} />
-      <View style={styles.taskInner}>
-        <View style={styles.taskTopRow}>
-          <Text style={styles.taskDate}>{formatDate(booking.createdAt)}</Text>
-          <Text style={styles.taskTracking}>#{trackingId(booking)}</Text>
+    <TouchableOpacity style={styles.pickupCard} onPress={onPress} activeOpacity={0.85}>
+      <View style={styles.pickupAccent} />
+      <View style={styles.pickupInner}>
+        <View style={styles.pickupTopRow}>
+          <Text style={styles.pickupDate}>{datePart}</Text>
+          <Text style={styles.pickupTracking}>#{trackingId(booking)}</Text>
         </View>
-        <View style={styles.taskMiddleRow}>
-          <Text style={styles.taskDevice} numberOfLines={2}>{deviceLine(booking)}</Text>
+
+        <View style={styles.pickupMetaRow}>
+          <Ionicons name="person-outline" size={11} color="#6B7280" />
+          <Text style={styles.pickupMetaText} numberOfLines={1}>{customerLine(booking)}</Text>
         </View>
-        <View style={styles.taskBottomRow}>
+        <View style={styles.pickupMetaRow}>
+          <Ionicons name="location-outline" size={11} color="#6B7280" />
+          <Text style={styles.pickupMetaText} numberOfLines={1}>{addressLine(booking)}</Text>
+        </View>
+
+        <View style={styles.pickupBottomRow}>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.taskStep, { color: stepColor }]}>{stepLine}</Text>
-            <Text style={styles.taskFooter}>{footerLine}</Text>
+            <Text style={[styles.pickupStep, { color: stepColor }]}>{stepLine}</Text>
+            <Text style={styles.pickupFooter}>{footerLine}</Text>
           </View>
           <TouchableOpacity
             onPress={onRefresh}
             disabled={refreshing}
             hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             activeOpacity={0.7}
-            style={styles.taskStatusIcon}
+            style={styles.pickupStatusIcon}
           >
-            {isPending && (
-              <View style={[styles.statusBadge, { backgroundColor: '#FEE2E2' }]}>
-                {refreshing ? (
-                  <ActivityIndicator size="small" color="#DC2626" />
-                ) : (
-                  <Ionicons name="refresh" size={14} color="#DC2626" />
-                )}
-              </View>
-            )}
-            {isInProcess && (
-              <View style={[styles.statusBadge, { backgroundColor: '#DBEAFE' }]}>
-                {refreshing ? (
-                  <ActivityIndicator size="small" color="#3B4FD7" />
-                ) : (
-                  <Ionicons name="refresh" size={14} color="#3B4FD7" />
-                )}
-              </View>
-            )}
-            {isCompleted && (
-              <View style={[styles.statusBadge, { backgroundColor: '#DCFCE7' }]}>
-                {refreshing ? (
-                  <ActivityIndicator size="small" color="#15803D" />
-                ) : (
-                  <Ionicons name="refresh" size={14} color="#15803D" />
-                )}
-              </View>
-            )}
+            <View style={[
+              styles.statusBadge,
+              isAssigned && { backgroundColor: '#DBEAFE' },
+              isInProgress && { backgroundColor: '#FFEDD5' },
+              isCompleted && { backgroundColor: '#DCFCE7' },
+            ]}>
+              {refreshing ? (
+                <ActivityIndicator size="small" color={stepColor} />
+              ) : (
+                <Ionicons name="refresh" size={14} color={stepColor} />
+              )}
+            </View>
           </TouchableOpacity>
         </View>
       </View>
@@ -437,24 +436,24 @@ const styles = StyleSheet.create({
   filterChipText: { fontSize: 11, color: '#6B7280', fontWeight: '600' },
   filterChipTextActive: { color: '#FFFFFF' },
 
-  taskCard: {
+  pickupCard: {
     flexDirection: 'row',
     backgroundColor: '#FFFFFF',
     borderRadius: 10,
     marginBottom: 8,
     overflow: 'hidden',
   },
-  taskAccent: { width: 3, backgroundColor: '#7C3AED' },
-  taskInner: { flex: 1, padding: 10 },
-  taskTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  taskDate: { fontSize: 12, fontWeight: '700', color: '#111827' },
-  taskTracking: { fontSize: 11, color: '#6B7280', fontWeight: '600' },
-  taskMiddleRow: { marginTop: 4 },
-  taskDevice: { fontSize: 11, color: '#374151' },
-  taskBottomRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6 },
-  taskStep: { fontSize: 11, fontWeight: '700' },
-  taskFooter: { fontSize: 10, color: '#9CA3AF', marginTop: 2 },
-  taskStatusIcon: { marginLeft: 8 },
+  pickupAccent: { width: 3, backgroundColor: '#7C3AED' },
+  pickupInner: { flex: 1, padding: 10 },
+  pickupTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  pickupDate: { fontSize: 12, fontWeight: '700', color: '#111827' },
+  pickupTracking: { fontSize: 11, color: '#6B7280', fontWeight: '600' },
+  pickupMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
+  pickupMetaText: { fontSize: 11, color: '#374151', flex: 1 },
+  pickupBottomRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6 },
+  pickupStep: { fontSize: 11, fontWeight: '700' },
+  pickupFooter: { fontSize: 10, color: '#9CA3AF', marginTop: 2 },
+  pickupStatusIcon: { marginLeft: 8 },
   statusBadge: {
     width: 24,
     height: 24,
@@ -462,7 +461,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  statusDot: { width: 8, height: 8, borderRadius: 4 },
 
   empty: { fontSize: 12, color: '#6B7280', textAlign: 'center', paddingVertical: 14 },
 });

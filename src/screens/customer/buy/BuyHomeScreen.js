@@ -1,24 +1,24 @@
 import React, { useEffect, useState } from 'react';
-import { Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ShoppingCart, ChevronRight } from 'lucide-react-native';
-import { SearchBar, EmptyState, Loader } from '../../../components/rnr';
+import { SearchBar, SectionHeader, EmptyState, Loader } from '../../../components/rnr';
 import { getDeviceCategories } from '../../../api/masterData';
 
-// Per-code emoji/tint fallback so admin-driven categories keep a friendly
-// visual when they have no uploaded image yet.
+// Per-code emoji/tint + tagline fallback so admin-driven categories keep a
+// friendly visual when they have no uploaded image yet.
 const CODE_META = {
-  MOBILE:        { emoji: '📱', bg: '#EEF2FF' },
-  SMARTPHONE:    { emoji: '📱', bg: '#EEF2FF' },
-  LAPTOP:        { emoji: '💻', bg: '#F5F3FF' },
-  SMARTWATCH:    { emoji: '⌚', bg: '#FFFBEB' },
-  SMARTWATCHES:  { emoji: '⌚', bg: '#FFFBEB' },
-  TABLET:        { emoji: '📲', bg: '#F0F9FF' },
-  AUDIO:         { emoji: '🎧', bg: '#FFF1F2' },
-  AUDIO_DEVICES: { emoji: '🎧', bg: '#FFF1F2' },
+  MOBILE:        { emoji: '📱', bg: '#EEF2FF', sub: 'iPhone, Android, all brands' },
+  SMARTPHONE:    { emoji: '📱', bg: '#EEF2FF', sub: 'iPhone, Android, all brands' },
+  LAPTOP:        { emoji: '💻', bg: '#F5F3FF', sub: 'Apple, Dell, HP, Lenovo, Asus' },
+  SMARTWATCH:    { emoji: '⌚', bg: '#FFFBEB', sub: 'Apple Watch, Wear OS, fitness' },
+  SMARTWATCHES:  { emoji: '⌚', bg: '#FFFBEB', sub: 'Apple Watch, Wear OS, fitness' },
+  TABLET:        { emoji: '📲', bg: '#F0F9FF', sub: 'iPad, Galaxy Tab, more' },
+  AUDIO:         { emoji: '🎧', bg: '#FFF1F2', sub: 'Earbuds, headphones, speakers' },
+  AUDIO_DEVICES: { emoji: '🎧', bg: '#FFF1F2', sub: 'Earbuds, headphones, speakers' },
 };
-const DEFAULT_META = { emoji: '📱', bg: '#EEF2FF' };
+const DEFAULT_META = { emoji: '📱', bg: '#EEF2FF', sub: 'Tap to see all listings' };
 
 function imgUri(item) {
   if (!item) return null;
@@ -31,6 +31,7 @@ function imgUri(item) {
 export default function BuyHomeScreen({ navigation }) {
   const [cats, setCats] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { width } = useWindowDimensions();
 
   useEffect(() => {
     (async () => {
@@ -51,6 +52,14 @@ export default function BuyHomeScreen({ navigation }) {
     });
   };
 
+  // Same grid math as Repair Home — 2 cols phones, 3 cols tablets, 0.66 image
+  // aspect. Keeps the three home screens visually consistent.
+  const numCols = width >= 600 ? 3 : 2;
+  const gridGap = 10;
+  const gridPadH = 14;
+  const cardW = Math.floor((width - gridPadH * 2 - gridGap * (numCols - 1)) / numCols);
+  const imgH = Math.round(cardW * 0.66);
+
   return (
     <View className="flex-1 bg-background">
       <SafeAreaView edges={['top']} style={{ backgroundColor: '#00008B' }}>
@@ -58,12 +67,13 @@ export default function BuyHomeScreen({ navigation }) {
           colors={['#00008B', '#2563EB']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={{ paddingTop: 12, paddingBottom: 28, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 }}
+          style={{ paddingTop: 12, paddingBottom: 22, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 }}
         >
-          <View className="px-4 flex-row items-center">
+          <View className="px-4 flex-row items-start">
             <View className="flex-1">
               <Text className="text-white text-[12px] font-bold tracking-widest">SHOP REFURBISHED</Text>
-              <Text className="text-white text-[22px] font-extrabold mt-1">Pick a category to begin</Text>
+              <Text className="text-white text-[24px] font-extrabold mt-1">Pick a category to begin</Text>
+              <Text className="text-white/80 text-[13px] mt-1">Best deals · Verified shops · Quality assured</Text>
             </View>
             <Pressable
               onPress={() => navigation.navigate('MyCart')}
@@ -79,11 +89,7 @@ export default function BuyHomeScreen({ navigation }) {
       </SafeAreaView>
 
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
-        <View className="px-4 mt-4 mb-2">
-          <Text className="text-[15px] font-extrabold text-text">Shop by Category</Text>
-          <Text className="text-[11px] text-text-muted mt-0.5">Tap a category to see its products</Text>
-        </View>
-
+        <SectionHeader title="Shop by Category" caption="Tap a category to see its products" />
         {loading ? (
           <View className="py-8"><Loader label="Loading categories..." /></View>
         ) : cats.length === 0 ? (
@@ -91,8 +97,8 @@ export default function BuyHomeScreen({ navigation }) {
             <EmptyState title="No categories yet" description="The admin hasn't published any device categories." />
           </View>
         ) : (
-          <View className="px-3">
-            {cats.map((c) => {
+          <View className="flex-row flex-wrap" style={{ paddingHorizontal: gridPadH }}>
+            {cats.map((c, i) => {
               const code = (c.code || '').toUpperCase();
               const meta = CODE_META[code] || DEFAULT_META;
               const uri = imgUri(c);
@@ -100,30 +106,29 @@ export default function BuyHomeScreen({ navigation }) {
                 <Pressable
                   key={c.id}
                   onPress={() => openCategory(c)}
-                  className="flex-row items-center bg-card border border-border rounded-2xl p-3 mb-2 active:opacity-80"
+                  className="bg-card border border-border rounded-2xl p-2.5 active:opacity-80"
                   style={{
-                    shadowColor: '#0F172A', shadowOpacity: 0.04, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 1,
+                    width: cardW,
+                    marginLeft: i % numCols === 0 ? 0 : gridGap,
+                    marginBottom: gridGap,
+                    shadowColor: '#0F172A', shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 1,
                   }}
                 >
                   <View
-                    className="rounded-xl items-center justify-center overflow-hidden mr-3"
-                    style={{ width: 56, height: 56, backgroundColor: uri ? '#F8FAFC' : meta.bg }}
+                    className="rounded-xl items-center justify-center overflow-hidden mb-2"
+                    style={{ width: '100%', height: imgH, backgroundColor: uri ? '#FFFFFF' : meta.bg }}
                   >
                     {uri ? (
-                      <Image source={{ uri }} style={{ width: '90%', height: '90%' }} resizeMode="contain" />
+                      <Image source={{ uri }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
                     ) : (
-                      <Text style={{ fontSize: 28 }}>{meta.emoji}</Text>
+                      <Text style={{ fontSize: 34 }}>{meta.emoji}</Text>
                     )}
                   </View>
-                  <View className="flex-1">
-                    <Text className="text-[14px] font-extrabold text-text" numberOfLines={1}>{c.name}</Text>
-                    {c.description ? (
-                      <Text className="text-[11px] text-text-muted mt-0.5" numberOfLines={1}>{c.description}</Text>
-                    ) : (
-                      <Text className="text-[11px] text-text-muted mt-0.5">Browse {c.name.toLowerCase()} listings</Text>
-                    )}
+                  <View className="flex-row items-center">
+                    <Text className="flex-1 text-[14px] font-extrabold text-text" numberOfLines={1}>{c.name}</Text>
+                    <ChevronRight size={16} color="#94A3B8" />
                   </View>
-                  <ChevronRight size={18} color="#94A3B8" />
+                  <Text className="text-[11px] text-text-muted mt-0.5" numberOfLines={2}>{meta.sub}</Text>
                 </Pressable>
               );
             })}

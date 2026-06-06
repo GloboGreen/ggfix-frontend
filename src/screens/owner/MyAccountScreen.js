@@ -1,10 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Modal, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getSession } from '../../auth/session';
 import { switchShop, fetchMe } from '../../api/auth';
+import { listShopKycDocuments } from '../../api/shops';
 
 const PRIMARY = '#00008B';
 const PRIMARY_MID = '#1E1EAC';
@@ -27,6 +29,8 @@ export default function MyAccountScreen({ onLogout, navigation }) {
   const [user, setUser] = useState(null);
   const [switching, setSwitching] = useState(false);
   const [showSwitcher, setShowSwitcher] = useState(false);
+  // null = unknown (haven't checked yet); true/false once we know.
+  const [hasKycDocs, setHasKycDocs] = useState(null);
 
   const reloadSession = async () => {
     // Prefer live /auth/me so the screen reflects DB state (shopName, shops,
@@ -40,6 +44,26 @@ export default function MyAccountScreen({ onLogout, navigation }) {
   };
 
   useEffect(() => { reloadSession(); }, []);
+
+  // Refresh KYC submission status whenever this screen comes into focus, so the
+  // KYC Documents row can route the user to View (already uploaded) vs Intro
+  // (first time) without a manual reload.
+  useFocusEffect(
+    useCallback(() => {
+      const sid = user?.shopId;
+      if (!sid) return;
+      let cancelled = false;
+      (async () => {
+        try {
+          const list = await listShopKycDocuments(sid);
+          if (!cancelled) setHasKycDocs(Array.isArray(list) && list.length > 0);
+        } catch {
+          if (!cancelled) setHasKycDocs(false);
+        }
+      })();
+      return () => { cancelled = true; };
+    }, [user?.shopId])
+  );
 
   const ownerName = user?.name || 'Shop Owner';
   const shopName = user?.shopName || (user?.shops?.find?.((s) => s.isActive)?.name) || '';
@@ -181,12 +205,12 @@ export default function MyAccountScreen({ onLogout, navigation }) {
           <MenuRow
             mci="file-document-outline"
             label="KYC Documents"
-            onPress={() => navigation?.navigate?.('OwnerKycIntro')}
+            onPress={() => navigation?.navigate?.(hasKycDocs ? 'OwnerKycView' : 'OwnerKycIntro')}
           />
           <MenuRow
             mci="truck-delivery-outline"
             label="Service Pickup Options"
-            onPress={() => navigation?.navigate?.('OwnerPickupOptions')}
+            onPress={() => navigation?.navigate?.('OwnerPickupSlots')}
           />
           <MenuRow
             mci="package-variant-closed"

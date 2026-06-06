@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Image, Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Tag, TrendingUp, ShieldCheck, Sparkles } from 'lucide-react-native';
+import { TrendingUp, ShieldCheck, Sparkles } from 'lucide-react-native';
 import { SectionHeader, OfferBanner, EmptyState, Loader } from '../../../components/rnr';
 import { getDeviceCategories } from '../../../api/masterData';
 
@@ -51,7 +51,8 @@ export default function SellHomeScreen({ navigation }) {
     })();
   }, []);
 
-  // Responsive grid: 2 cards per row on phones, 3 on wider screens/tablets.
+  // Same grid math as Repair / Buy home — 2 cols on phones, 3 on tablets,
+  // 0.66 image aspect ratio. Keeps the three home screens visually consistent.
   const numCols = width >= 600 ? 3 : 2;
   const gridGap = 10;
   const gridPadH = 14;
@@ -65,35 +66,30 @@ export default function SellHomeScreen({ navigation }) {
           colors={['#059669', '#10B981']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={{ paddingTop: 8, paddingBottom: 14, borderBottomLeftRadius: 20, borderBottomRightRadius: 20 }}
+          style={{ paddingTop: 12, paddingBottom: 22, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 }}
         >
           <View className="px-4">
-            <Text className="text-white text-[10px] font-bold tracking-widest">SELL & EARN</Text>
-            <Text className="text-white text-[19px] font-extrabold mt-0.5">Turn your old tech into cash</Text>
-            <Text className="text-white/85 text-[11px] mt-1">Best price from verified shops nearby.</Text>
+            <Text className="text-white text-[12px] font-bold tracking-widest">SELL & EARN</Text>
+            <Text className="text-white text-[24px] font-extrabold mt-1">Turn your old tech into cash</Text>
+            <Text className="text-white/85 text-[13px] mt-1">Best price from verified shops nearby.</Text>
           </View>
         </LinearGradient>
       </SafeAreaView>
 
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 28 }}>
-        {/* Trust strip — sits cleanly below the header */}
-        <View className="px-4 mt-3">
-          <View className="flex-row bg-card border border-border rounded-xl p-2"
-                style={{ shadowColor: '#0F172A', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 3 }}>
-            <View className="flex-1 items-center px-1">
-              <TrendingUp size={14} color="#10B981" />
-              <Text className="text-[10px] font-extrabold text-text mt-0.5 text-center">Best Price</Text>
-            </View>
-            <View className="w-px bg-border my-1" />
-            <View className="flex-1 items-center px-1">
-              <ShieldCheck size={14} color="#2563EB" />
-              <Text className="text-[10px] font-extrabold text-text mt-0.5 text-center">Verified Shops</Text>
-            </View>
-            <View className="w-px bg-border my-1" />
-            <View className="flex-1 items-center px-1">
-              <Sparkles size={14} color="#F59E0B" />
-              <Text className="text-[10px] font-extrabold text-text mt-0.5 text-center">Free Pickup</Text>
-            </View>
+      <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
+        {/* Trust strip — 3 cards matching Repair Home's promise cards */}
+        <View className="flex-row px-4 mt-4">
+          <View className="flex-1 bg-card border border-border rounded-2xl py-3 px-2 items-center mx-1">
+            <TrendingUp size={18} color="#10B981" />
+            <Text className="text-[10px] font-bold text-text text-center mt-1.5">Best Price</Text>
+          </View>
+          <View className="flex-1 bg-card border border-border rounded-2xl py-3 px-2 items-center mx-1">
+            <ShieldCheck size={18} color="#2563EB" />
+            <Text className="text-[10px] font-bold text-text text-center mt-1.5">Verified Shops</Text>
+          </View>
+          <View className="flex-1 bg-card border border-border rounded-2xl py-3 px-2 items-center mx-1">
+            <Sparkles size={18} color="#F59E0B" />
+            <Text className="text-[10px] font-bold text-text text-center mt-1.5">Free Pickup</Text>
           </View>
         </View>
 
@@ -132,14 +128,8 @@ export default function SellHomeScreen({ navigation }) {
                       <Text style={{ fontSize: 34 }}>{meta.emoji}</Text>
                     )}
                   </View>
-                  <View className="flex-row items-center">
-                    <Text className="flex-1 text-[14px] font-extrabold text-text" numberOfLines={1}>{c.name}</Text>
-                    <View className="bg-success/10 rounded-full px-1.5 py-0.5 flex-row items-center ml-1">
-                      <Tag size={9} color="#10B981" />
-                      <Text className="text-[9px] font-bold text-success ml-0.5">Sell</Text>
-                    </View>
-                  </View>
-                  <Text className="text-[11px] text-text-muted mt-0.5" numberOfLines={1}>{meta.sub}</Text>
+                  <Text className="text-[14px] font-extrabold text-text" numberOfLines={1}>{c.name}</Text>
+                  <Text className="text-[11px] text-text-muted mt-0.5" numberOfLines={2}>{meta.sub}</Text>
                 </Pressable>
               );
             })}

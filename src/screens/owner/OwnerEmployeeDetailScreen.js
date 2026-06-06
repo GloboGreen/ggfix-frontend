@@ -13,13 +13,16 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { authApi, ticketApi } from '../../api/client';
+import { uploadMedia } from '../../api/masterData';
 import { selectShopId } from '../../store/authSlice';
 
-const ROLES = ['Junior Technician', 'Technician', 'Senior Technician', 'Pickup Person', 'Employee'];
+const ROLES = ['Technician', 'Staff', 'Pickup Person'];
 const ID_TYPES = ['Aadhar', 'PAN'];
 const SALARY_PERIODS = ['Monthly', 'Weekly'];
 
@@ -46,9 +49,75 @@ export default function OwnerEmployeeDetailScreen({ route, navigation }) {
     defaultCheckIn: employee?.defaultCheckIn ?? '09:30',
     defaultCheckOut: employee?.defaultCheckOut ?? '18:30',
     photoUrl: employee?.photoUrl ?? '',
+    dailyWage: employee?.dailyWage ?? '',
+    idFrontUrl: employee?.idFrontUrl ?? '',
+    idBackUrl: employee?.idBackUrl ?? '',
   });
 
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
+
+  const [uploading, setUploading] = useState({});
+
+  const FOLDER_FOR = {
+    photoUrl: 'employees',
+    idFrontUrl: 'employee-ids',
+    idBackUrl: 'employee-ids',
+  };
+
+  const pickImage = async (field, fromCamera) => {
+    try {
+      const perm = fromCamera
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert(
+          'Permission needed',
+          `Please allow ${fromCamera ? 'camera' : 'photo library'} access to upload an image.`
+        );
+        return;
+      }
+      const opts = {
+        quality: 0.7,
+        mediaTypes: ['images'],
+      };
+      const result = fromCamera
+        ? await ImagePicker.launchCameraAsync(opts)
+        : await ImagePicker.launchImageLibraryAsync(opts);
+      if (result.canceled || !result.assets?.[0]?.uri) return;
+
+      const asset = result.assets[0];
+      // Show preview immediately, then upload in background and swap in the hosted URL.
+      set(field, asset.uri);
+      setUploading((p) => ({ ...p, [field]: true }));
+      try {
+        const hostedUrl = await uploadMedia(asset, FOLDER_FOR[field] || 'employees');
+        if (hostedUrl) set(field, hostedUrl);
+        else throw new Error('Server returned no URL');
+      } catch (uploadErr) {
+        set(field, '');
+        Alert.alert('Upload failed', uploadErr?.message || 'Could not upload image. Please try again.');
+      } finally {
+        setUploading((p) => ({ ...p, [field]: false }));
+      }
+    } catch (e) {
+      Alert.alert('Could not pick image', e?.message || 'Please try again.');
+    }
+  };
+
+  const promptImageSource = (field) => {
+    // RN Web's Alert.alert collapses to window.alert and ignores multi-button menus,
+    // so the Take Photo / Choose from Library sheet never fires the picker on web.
+    // Go straight to the library picker on web; show the action sheet on native.
+    if (Platform.OS === 'web') {
+      pickImage(field, false);
+      return;
+    }
+    Alert.alert('Add image', '', [
+      { text: 'Take Photo', onPress: () => pickImage(field, true) },
+      { text: 'Choose from Library', onPress: () => pickImage(field, false) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
 
   const handleSaveNew = async () => {
     if (!form.name?.trim()) {
@@ -111,6 +180,16 @@ export default function OwnerEmployeeDetailScreen({ route, navigation }) {
 
   const doCreateEmployee = async (userId) => {
     try {
+      // If any image upload is still in progress, block save and ask the user to wait.
+      if (Object.values(uploading).some(Boolean)) {
+        Alert.alert('Please wait', 'An image is still uploading.');
+        setSaving(false);
+        return;
+      }
+      const photoUrl = form.photoUrl;
+      const idFrontUrl = form.idFrontUrl;
+      const idBackUrl = form.idBackUrl;
+
       const withLogin = !!userId;
       const body = {
         name: form.name.trim(),
@@ -125,7 +204,10 @@ export default function OwnerEmployeeDetailScreen({ route, navigation }) {
         dateOfJoin: (form.dateOfJoin && form.dateOfJoin.trim()) || null,
         defaultCheckIn: (form.defaultCheckIn && form.defaultCheckIn.trim()) || null,
         defaultCheckOut: (form.defaultCheckOut && form.defaultCheckOut.trim()) || null,
-        photoUrl: (form.photoUrl && form.photoUrl.trim()) || null,
+        photoUrl: (photoUrl && photoUrl.trim()) || null,
+        dailyWage: (form.dailyWage && String(form.dailyWage).trim()) || null,
+        idFrontUrl: (idFrontUrl && idFrontUrl.trim()) || null,
+        idBackUrl: (idBackUrl && idBackUrl.trim()) || null,
       };
       if (userId) body.userId = userId;
       const created = await ticketApi.post('/technicians', {
@@ -199,118 +281,360 @@ export default function OwnerEmployeeDetailScreen({ route, navigation }) {
           style={{ flex: 1 }}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          <ScrollView contentContainerStyle={styles.content}>
-            <Text style={styles.sectionTitle}>New Staff</Text>
-            <View style={styles.card}>
-              <Text style={styles.label}>Name *</Text>
+          <ScrollView
+            contentContainerStyle={styles.addContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Basic Information */}
+            <View style={styles.addCard}>
+              <View style={styles.addSectionHeader}>
+                <Ionicons name="person-circle-outline" size={16} color="#3B4FD7" />
+                <Text style={styles.addSectionTitle}>Basic Information</Text>
+              </View>
+
+              <View style={styles.addTwoCol}>
+                <View style={styles.addColMain}>
+                  <Text style={styles.addLabel}>
+                    Employee Name <Text style={styles.req}>*</Text>
+                  </Text>
+                  <TextInput
+                    style={styles.addInput}
+                    placeholder="Enter name"
+                    placeholderTextColor="#9CA3AF"
+                    value={form.name}
+                    onChangeText={(v) => set('name', v)}
+                  />
+                  <Text style={styles.addLabel}>Employee Email</Text>
+                  <TextInput
+                    style={styles.addInput}
+                    placeholder="name@example.com"
+                    placeholderTextColor="#9CA3AF"
+                    value={form.email}
+                    onChangeText={(v) => set('email', v)}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                </View>
+                <View style={styles.addColPhoto}>
+                  <Text style={styles.addLabel}>
+                    Photo <Text style={styles.req}>*</Text>
+                  </Text>
+                  <View style={styles.photoBox}>
+                    {form.photoUrl ? (
+                      <Image source={{ uri: form.photoUrl }} style={styles.photoPreview} />
+                    ) : (
+                      <View style={styles.photoAvatar}>
+                        <Ionicons name="person" size={26} color="#9CA3AF" />
+                      </View>
+                    )}
+                    {uploading.photoUrl && (
+                      <View style={styles.photoUploadingOverlay}>
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      </View>
+                    )}
+                    <TouchableOpacity
+                      style={styles.takePhotoBtnSm}
+                      activeOpacity={0.85}
+                      onPress={() => promptImageSource('photoUrl')}
+                      disabled={!!uploading.photoUrl}
+                    >
+                      <Ionicons name="camera" size={11} color="#FFFFFF" />
+                      <Text style={styles.takePhotoTextSm}>
+                        {uploading.photoUrl ? 'Uploading…' : form.photoUrl ? 'Change' : 'Take Photo'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+
+              <Text style={styles.addLabel}>
+                Mobile Number <Text style={styles.req}>*</Text>
+              </Text>
               <TextInput
-                style={styles.input}
-                placeholder="Enter name"
-                value={form.name}
-                onChangeText={(v) => set('name', v)}
-              />
-              <Text style={styles.label}>Phone</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter mobile"
+                style={styles.addInput}
+                placeholder="Enter mobile number"
+                placeholderTextColor="#9CA3AF"
                 value={form.phone}
                 onChangeText={(v) => set('phone', v)}
                 keyboardType="phone-pad"
               />
-              <Text style={styles.label}>Email (for login)</Text>
+
+              <Text style={styles.addLabel}>
+                Employee Role <Text style={styles.req}>*</Text>
+              </Text>
+              <TouchableOpacity
+                style={styles.addInputRow}
+                onPress={() => {
+                  Alert.alert('Select Role', '', [
+                    ...ROLES.map((r) => ({ text: r, onPress: () => set('roleLabel', r) })),
+                    { text: 'Cancel', style: 'cancel' },
+                  ]);
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.addInputRowText}>{form.roleLabel || 'Select role'}</Text>
+                <Ionicons name="chevron-down" size={14} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Dates + Shift */}
+            <View style={styles.addCard}>
+              <View style={styles.addRow}>
+                <View style={styles.addRowItem}>
+                  <Text style={styles.addLabel}>Date of Birth</Text>
+                  <View style={styles.addInputRow}>
+                    <Ionicons name="calendar-outline" size={13} color="#3B4FD7" />
+                    <TextInput
+                      style={styles.addInputInline}
+                      placeholder="YYYY-MM-DD"
+                      placeholderTextColor="#9CA3AF"
+                      value={form.dateOfBirth}
+                      onChangeText={(v) => set('dateOfBirth', v)}
+                    />
+                  </View>
+                </View>
+                <View style={styles.addRowItem}>
+                  <Text style={styles.addLabel}>Date of Join</Text>
+                  <View style={styles.addInputRow}>
+                    <Ionicons name="calendar-outline" size={13} color="#3B4FD7" />
+                    <TextInput
+                      style={styles.addInputInline}
+                      placeholder="YYYY-MM-DD"
+                      placeholderTextColor="#9CA3AF"
+                      value={form.dateOfJoin}
+                      onChangeText={(v) => set('dateOfJoin', v)}
+                    />
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.addRow}>
+                <View style={styles.addRowItem}>
+                  <Text style={styles.addLabel}>Check In</Text>
+                  <View style={styles.addInputRow}>
+                    <Ionicons name="time-outline" size={13} color="#22C55E" />
+                    <TextInput
+                      style={styles.addInputInline}
+                      placeholder="09:30"
+                      placeholderTextColor="#9CA3AF"
+                      value={form.defaultCheckIn}
+                      onChangeText={(v) => set('defaultCheckIn', v)}
+                    />
+                  </View>
+                </View>
+                <View style={styles.addRowItem}>
+                  <Text style={styles.addLabel}>Check Out</Text>
+                  <View style={styles.addInputRow}>
+                    <Ionicons name="time-outline" size={13} color="#DC2626" />
+                    <TextInput
+                      style={styles.addInputInline}
+                      placeholder="18:30"
+                      placeholderTextColor="#9CA3AF"
+                      value={form.defaultCheckOut}
+                      onChangeText={(v) => set('defaultCheckOut', v)}
+                    />
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {/* ID Verification */}
+            <View style={styles.addCard}>
+              <View style={styles.addSectionHeader}>
+                <Ionicons name="shield-checkmark-outline" size={16} color="#3B4FD7" />
+                <Text style={styles.addSectionTitle}>ID Verification</Text>
+              </View>
+
+              <View style={styles.idTabs}>
+                {ID_TYPES.map((t) => {
+                  const active = form.idVerificationType === t;
+                  return (
+                    <TouchableOpacity
+                      key={t}
+                      style={[styles.idTab, active && styles.idTabActive]}
+                      onPress={() => set('idVerificationType', t)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.idTabText, active && styles.idTabTextActive]}>
+                        {t === 'Aadhar' ? 'Aadhar Card' : 'PAN Card'}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <View style={styles.idUploadRow}>
+                <TouchableOpacity
+                  style={styles.idUploadTile}
+                  activeOpacity={0.85}
+                  onPress={() => promptImageSource('idFrontUrl')}
+                  disabled={!!uploading.idFrontUrl}
+                >
+                  {form.idFrontUrl ? (
+                    <>
+                      <Image source={{ uri: form.idFrontUrl }} style={styles.idUploadPreview} />
+                      <View style={styles.idUploadBadge}>
+                        <Ionicons name="checkmark-circle" size={14} color="#22C55E" />
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      <Ionicons name="cloud-upload-outline" size={20} color="#9CA3AF" />
+                      <Text style={styles.idUploadText}>Upload Front</Text>
+                    </>
+                  )}
+                  {uploading.idFrontUrl && (
+                    <View style={styles.idUploadingOverlay}>
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                      <Text style={styles.idUploadingText}>Uploading…</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.idUploadTile}
+                  activeOpacity={0.85}
+                  onPress={() => promptImageSource('idBackUrl')}
+                  disabled={!!uploading.idBackUrl}
+                >
+                  {form.idBackUrl ? (
+                    <>
+                      <Image source={{ uri: form.idBackUrl }} style={styles.idUploadPreview} />
+                      <View style={styles.idUploadBadge}>
+                        <Ionicons name="checkmark-circle" size={14} color="#22C55E" />
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      <Ionicons name="cloud-upload-outline" size={20} color="#9CA3AF" />
+                      <Text style={styles.idUploadText}>Upload Back</Text>
+                    </>
+                  )}
+                  {uploading.idBackUrl && (
+                    <View style={styles.idUploadingOverlay}>
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                      <Text style={styles.idUploadingText}>Uploading…</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </View>
+              {(form.idFrontUrl || form.idBackUrl) && (
+                <View style={styles.idUploadedRow}>
+                  <Ionicons name="checkmark-circle" size={14} color="#22C55E" />
+                  <Text style={styles.idUploadedText}>
+                    {form.idVerificationType || 'ID'} uploaded successfully
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      set('idFrontUrl', '');
+                      set('idBackUrl', '');
+                    }}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons name="trash-outline" size={14} color="#DC2626" />
+                  </TouchableOpacity>
+                </View>
+              )}
+
               <TextInput
-                style={styles.input}
-                placeholder="Enter email — leave blank for no login"
-                value={form.email}
-                onChangeText={(v) => set('email', v)}
-                keyboardType="email-address"
-                autoCapitalize="none"
+                style={[styles.addInput, { marginTop: 4 }]}
+                placeholder="ID number (optional)"
+                placeholderTextColor="#9CA3AF"
+                value={form.idNumber}
+                onChangeText={(v) => set('idNumber', v)}
               />
-              <Text style={styles.label}>Password (for login)</Text>
+            </View>
+
+            {/* Salary Package */}
+            <View style={styles.addCard}>
+              <View style={styles.addSectionHeader}>
+                <Ionicons name="cash-outline" size={16} color="#3B4FD7" />
+                <Text style={styles.addSectionTitle}>Salary Package</Text>
+              </View>
+
+              <View style={styles.salaryRow}>
+                <Text style={styles.salaryLabel}>1. Monthly Salary</Text>
+                <View style={styles.salaryInputWrap}>
+                  <Text style={styles.salaryCurrency}>₹</Text>
+                  <TextInput
+                    style={styles.salaryInput}
+                    placeholder="Enter amount"
+                    placeholderTextColor="#C7CDDB"
+                    value={form.salaryAmount}
+                    onChangeText={(v) => {
+                      set('salaryAmount', v);
+                      set('salaryPeriod', 'Monthly');
+                    }}
+                    keyboardType="numeric"
+                  />
+                </View>
+              </View>
+              <View style={styles.salaryRow}>
+                <Text style={styles.salaryLabel}>2. Daily Wage</Text>
+                <View style={styles.salaryInputWrap}>
+                  <Text style={styles.salaryCurrency}>₹</Text>
+                  <TextInput
+                    style={styles.salaryInput}
+                    placeholder="Enter amount"
+                    placeholderTextColor="#C7CDDB"
+                    value={form.dailyWage}
+                    onChangeText={(v) => set('dailyWage', v)}
+                    keyboardType="numeric"
+                  />
+                </View>
+              </View>
+            </View>
+
+            {/* App Login (optional) */}
+            <View style={styles.addCard}>
+              <View style={styles.addSectionHeader}>
+                <Ionicons name="lock-closed-outline" size={16} color="#3B4FD7" />
+                <Text style={styles.addSectionTitle}>App Login (optional)</Text>
+              </View>
+              <Text style={styles.addLabel}>Password</Text>
               <TextInput
-                style={styles.input}
-                placeholder="Min 4 characters — leave blank for no login"
+                style={styles.addInput}
+                placeholder="Min 4 characters"
+                placeholderTextColor="#9CA3AF"
                 value={form.password}
                 onChangeText={(v) => set('password', v)}
                 secureTextEntry
               />
-              <Text style={styles.label}>Employee photo (optional)</Text>
-              <View style={styles.photoPlaceholder}>
-                <Ionicons name="person" size={40} color="#9CA3AF" />
-                <TouchableOpacity style={styles.takePhotoBtn}><Text style={styles.takePhotoText}>Take Photo</Text></TouchableOpacity>
+              <View style={styles.otpHint}>
+                <Ionicons name="information-circle-outline" size={13} color="#3B4FD7" />
+                <Text style={styles.otpHintText}>
+                  Employee can sign in with email or mobile + password, or with mobile + OTP (default
+                  OTP: 123456).
+                </Text>
               </View>
-              <Text style={styles.label}>Date of birth</Text>
-              <TextInput style={styles.input} placeholder="YYYY-MM-DD e.g. 2000-01-04" value={form.dateOfBirth} onChangeText={(v) => set('dateOfBirth', v)} />
-              <Text style={styles.label}>Date of join</Text>
-              <TextInput style={styles.input} placeholder="YYYY-MM-DD e.g. 2026-01-04" value={form.dateOfJoin} onChangeText={(v) => set('dateOfJoin', v)} />
-              <Text style={styles.label}>Check in (default)</Text>
-              <TextInput style={styles.input} placeholder="09:30" value={form.defaultCheckIn} onChangeText={(v) => set('defaultCheckIn', v)} />
-              <Text style={styles.label}>Check out (default)</Text>
-              <TextInput style={styles.input} placeholder="18:30" value={form.defaultCheckOut} onChangeText={(v) => set('defaultCheckOut', v)} />
-              <Text style={styles.label}>Role</Text>
-              <View style={styles.roleRow}>
-                {ROLES.map((r) => (
-                  <TouchableOpacity
-                    key={r}
-                    style={[styles.roleChip, form.roleLabel === r && styles.roleChipActive]}
-                    onPress={() => set('roleLabel', r)}
-                  >
-                    <Text style={[styles.roleChipText, form.roleLabel === r && styles.roleChipTextActive]}>{r}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              <Text style={styles.label}>Salary (optional)</Text>
-              <View style={styles.roleRow}>
-                {SALARY_PERIODS.map((p) => (
-                  <TouchableOpacity
-                    key={p}
-                    style={[styles.roleChip, form.salaryPeriod === p && styles.roleChipActive]}
-                    onPress={() => set('salaryPeriod', p)}
-                  >
-                    <Text style={[styles.roleChipText, form.salaryPeriod === p && styles.roleChipTextActive]}>{p}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              <TextInput
-                style={[styles.input, { marginTop: 6 }]}
-                placeholder="Amount (e.g. 25000)"
-                value={form.salaryAmount}
-                onChangeText={(v) => set('salaryAmount', v)}
-                keyboardType="numeric"
-              />
-              <Text style={styles.label}>ID verification (optional)</Text>
-              <View style={styles.roleRow}>
-                {ID_TYPES.map((t) => (
-                  <TouchableOpacity
-                    key={t}
-                    style={[styles.roleChip, form.idVerificationType === t && styles.roleChipActive]}
-                    onPress={() => set('idVerificationType', t)}
-                  >
-                    <Text style={[styles.roleChipText, form.idVerificationType === t && styles.roleChipTextActive]}>{t}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              <TextInput
-                style={[styles.input, { marginTop: 6 }]}
-                placeholder="ID number"
-                value={form.idNumber}
-                onChangeText={(v) => set('idNumber', v)}
-              />
-              <Text style={[styles.label, { marginTop: 12 }]}>Set Login mPIN</Text>
-              <TextInput style={styles.input} placeholder="Coming soon" editable={false} />
-              <TouchableOpacity
-                style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
-                onPress={handleSaveNew}
-                disabled={saving}
-              >
-                {saving ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.saveBtnText}>Create Employee</Text>
-                )}
-              </TouchableOpacity>
             </View>
           </ScrollView>
+
+          {/* Sticky footer */}
+          <View style={styles.footerBar}>
+            <TouchableOpacity
+              style={styles.footerCancel}
+              onPress={() => navigation.goBack()}
+              activeOpacity={0.85}
+              disabled={saving}
+            >
+              <Text style={styles.footerCancelText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.footerCreate, saving && styles.saveBtnDisabled]}
+              onPress={handleSaveNew}
+              disabled={saving}
+              activeOpacity={0.85}
+            >
+              {saving ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" />
+                  <Text style={styles.footerCreateText}>Create Employee</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
     );
@@ -326,151 +650,267 @@ export default function OwnerEmployeeDetailScreen({ route, navigation }) {
     );
   }
 
+  const now = new Date();
+  const monthLabel = now.toLocaleString('en-IN', { month: 'short', year: 'numeric' });
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const presentDays = attendanceSummary?.presentDays ?? 0;
+  const presentPct = Math.max(0, Math.min(1, presentDays / daysInMonth));
+
+  // Role-gated reports:
+  //   Technician    → Task Report (repair-booking tasks)
+  //   Pickup Person → Pickup Report (pickup assignments)
+  //   Employee      → neither
+  const role = (employee?.roleLabel || '').trim().toLowerCase();
+  const showTaskReport = role === 'technician';
+  const showPickupReport = role === 'pickup person';
+  const CATEGORIES = [
+    { key: 'shift',    icon: 'time-outline',      label: 'Daily Shift\nSchedule', route: 'OwnerEmployeeShiftDetails' },
+    { key: 'monthly',  icon: 'calendar-outline',  label: 'Monthly\nSummary',      route: 'OwnerEmployeeAttendance' },
+    { key: 'leave',    icon: 'briefcase-outline', label: 'Leave\nReport',         route: 'OwnerEmployeeLeave' },
+    ...(showTaskReport
+      ? [{ key: 'task',   icon: 'laptop-outline', label: 'Task\nReport',          route: 'OwnerEmployeeWorkingRecord' }]
+      : []),
+    ...(showPickupReport
+      ? [{ key: 'pickup', icon: 'car-outline',    label: 'Pickup\nReport',        route: 'OwnerEmployeePickupReport' }]
+      : []),
+    { key: 'salary',   icon: 'receipt-outline',   label: 'Salary\nReport',        route: 'OwnerEmployeeSalaryReport' },
+  ];
+
+  const confirmToggleActive = () => {
+    Alert.alert(
+      active ? 'Mark as Inactive?' : 'Mark as Active?',
+      active
+        ? 'Employee will not be available for new assignments.'
+        : 'Employee will be available for assignments.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: active ? 'Mark Inactive' : 'Mark Active', onPress: () => handleToggleActive(!active) },
+      ]
+    );
+  };
+
+  const advanceStatus = (recentAdvance?.status || '').toUpperCase();
+  const isPaid = advanceStatus === 'PAID';
+  const leaveStatus = (recentLeave?.status || '').toUpperCase();
+  const isApproved = leaveStatus === 'APPROVED';
+  const isRejected = leaveStatus === 'REJECTED';
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.profileCard}>
-          <View style={styles.avatarLarge} />
-          <Text style={styles.profileName}>{employee.name}</Text>
-          <Text style={styles.profileId}>ID: {empId}</Text>
-          <View style={styles.statusBadge}>
-            <View style={[styles.statusDot, active && styles.statusDotActive]} />
-            <Text style={[styles.statusBadgeText, active && styles.statusBadgeTextActive]}>Status: {active ? 'Active' : 'Inactive'}</Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.meta}>Active (available for assignment)</Text>
-            <Switch
-              value={active}
-              onValueChange={handleToggleActive}
-              trackColor={{ false: '#D1D5DB', true: '#86EFAC' }}
-              thumbColor={active ? '#22C55E' : '#9CA3AF'}
-            />
-          </View>
-        </View>
-        <View style={[styles.card, { marginTop: 12 }]}>
-          <Text style={styles.sectionTitle}>Check-in / Check-out</Text>
-          <View style={styles.checkInOutRow}>
-            <View style={styles.checkCard}>
-              <Ionicons name="partly-sunny-outline" size={24} color="#22C55E" />
-              <Text style={styles.checkLabel}>CHECK IN</Text>
-              <Text style={styles.checkTime}>{formatTime(employee.defaultCheckIn)}</Text>
-            </View>
-            <View style={styles.checkCard}>
-              <Ionicons name="moon-outline" size={24} color="#DC2626" />
-              <Text style={styles.checkLabel}>CHECK OUT</Text>
-              <Text style={[styles.checkTime, { color: '#DC2626' }]}>{formatTime(employee.defaultCheckOut)}</Text>
-            </View>
-          </View>
-        </View>
-        <View style={[styles.card, { marginTop: 12 }]}>
-          <Text style={styles.sectionTitle}>Categories</Text>
-          <TouchableOpacity style={styles.linkRow} onPress={() => navigation.navigate('OwnerEmployeeShiftDetails', { employee })}>
-            <Ionicons name="time-outline" size={20} color="#3B4FD7" /><Text style={styles.linkText}>Daily Shift Schedule</Text>
-            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.linkRow} onPress={() => navigation.navigate('OwnerEmployeeAttendance', { employee })}>
-            <Ionicons name="calendar-outline" size={20} color="#3B4FD7" /><Text style={styles.linkText}>Monthly Summary</Text>
-            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.linkRow} onPress={() => navigation.navigate('OwnerEmployeeLeave', { employee })}>
-            <Ionicons name="person-outline" size={20} color="#3B4FD7" /><Text style={styles.linkText}>Leave Report</Text>
-            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.linkRow} onPress={() => navigation.navigate('OwnerEmployeeSalaryReport', { employee })}>
-            <Ionicons name="document-text-outline" size={20} color="#3B4FD7" /><Text style={styles.linkText}>Salary Report</Text>
-            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.linkRow, { borderBottomWidth: 0 }]} onPress={() => navigation.navigate('OwnerEmployeeWorkingRecord', { employee })}>
-            <Ionicons name="briefcase-outline" size={20} color="#3B4FD7" /><Text style={styles.linkText}>Work Record</Text>
-            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-          </TouchableOpacity>
-        </View>
-        <View style={[styles.card, { marginTop: 12 }]}>
-          <Text style={styles.sectionTitle}>This month</Text>
-          <View style={styles.statsRow}>
-            <View style={styles.miniStat}><Text style={styles.miniStatValue}>{attendanceSummary?.presentDays ?? 0}</Text><Text style={styles.miniStatLabel}>Present</Text></View>
-            <View style={styles.miniStat}><Text style={styles.miniStatValue}>{attendanceSummary?.leaveDays ?? 0}</Text><Text style={styles.miniStatLabel}>Leave</Text></View>
-            <View style={styles.miniStat}><Text style={styles.miniStatValue}>{attendanceSummary?.permissionCount ?? 0}</Text><Text style={styles.miniStatLabel}>Permission</Text></View>
-            <View style={styles.miniStat}><Text style={styles.miniStatValue}>{attendanceSummary?.lateHours ?? '0'}</Text><Text style={styles.miniStatLabel}>Late Hrs</Text></View>
-          </View>
-        </View>
-        <View style={[styles.card, { marginTop: 12 }]}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Recent salary advance</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('OwnerEmployeeAddAdvance', { employee })}>
-              <Text style={styles.addLinkText}>+ Add</Text>
-            </TouchableOpacity>
-          </View>
-          {recentAdvance ? (
-            <View style={styles.recentCard}>
-              <Text style={styles.recentMeta}>{formatAdvanceDate(recentAdvance.advanceDate)} • ₹{recentAdvance.amount} Advance</Text>
-              <View style={styles.tagRow}>
-                <View style={[styles.tag, recentAdvance.status === 'PAID' && styles.tagPaid]}><Text style={styles.tagText}>{recentAdvance.status === 'PAID' ? 'Paid' : 'Not Paid'}</Text></View>
-              </View>
-              <Text style={styles.recentMeta}>Request: {recentAdvance.requestedAt ? new Date(recentAdvance.requestedAt).toLocaleString('en-IN') : '—'}</Text>
-            </View>
-          ) : (
-            <Text style={styles.meta}>No advances</Text>
-          )}
-        </View>
-        <View style={[styles.card, { marginTop: 12 }]}>
-          <Text style={styles.sectionTitle}>Recent leave request</Text>
-          {recentLeave ? (
-            <View style={styles.recentCard}>
-              <Text style={styles.recentMeta}>{formatLeaveDate(recentLeave.startDate)} • {recentLeave.reason || 'Leave'}</Text>
-              <Text style={styles.recentMeta}>{recentLeave.appliedDaysLabel} • Request: {recentLeave.requestedAt ? new Date(recentLeave.requestedAt).toLocaleString('en-IN') : '—'}</Text>
-              <View style={styles.tagRow}>
-                <View style={[styles.tag, recentLeave.status === 'APPROVED' && styles.tagPaid, recentLeave.status === 'REJECTED' && styles.tagRejected]}><Text style={styles.tagText}>{recentLeave.status}</Text></View>
-              </View>
-            </View>
-          ) : (
-            <Text style={styles.meta}>No leave requests</Text>
-          )}
-        </View>
-        <View style={[styles.card, { marginTop: 12 }]}>
-          <Text style={styles.sectionTitle}>Contact & role</Text>
-          <Text style={styles.meta}>Role: {employee.roleLabel || 'Technician'}</Text>
-          <Text style={styles.meta}>Phone: {employee.phone || '—'}</Text>
-          <Text style={styles.meta}>Email: {employee.email || '—'}</Text>
-          {employee.dateOfBirth ? <Text style={styles.meta}>DOB: {employee.dateOfBirth}</Text> : null}
-          {employee.dateOfJoin ? <Text style={styles.meta}>Joined: {employee.dateOfJoin}</Text> : null}
-        </View>
-        {(employee.idVerificationType || employee.idNumber) ? (
-          <View style={[styles.card, { marginTop: 12 }]}>
-            <Text style={styles.sectionTitle}>ID verification</Text>
-            <Text style={styles.meta}>Type: {employee.idVerificationType || '—'}</Text>
-            <Text style={styles.meta}>Number: {employee.idNumber ? '••••' + String(employee.idNumber).slice(-4) : '—'}</Text>
-          </View>
-        ) : null}
-        {(employee.salaryAmount || employee.salaryPeriod) ? (
-          <View style={[styles.card, { marginTop: 12 }]}>
-            <Text style={styles.sectionTitle}>Salary</Text>
-            <Text style={styles.meta}>
-              {employee.salaryAmount ? `₹${employee.salaryAmount}` : '—'} {employee.salaryPeriod ? `(${employee.salaryPeriod})` : ''}
+      <ScrollView contentContainerStyle={styles.viewContent}>
+        {/* Hero header */}
+        <View style={styles.heroCard}>
+          <TouchableOpacity style={styles.heroStatus} onPress={confirmToggleActive} activeOpacity={0.7}>
+            <Text style={styles.heroStatusLabel}>Status: </Text>
+            <Text style={[styles.heroStatusValue, active ? styles.statusOk : styles.statusOff]}>
+              {active ? 'Active' : 'Inactive'}
             </Text>
+          </TouchableOpacity>
+          <View style={styles.heroAvatarWrap}>
+            {employee.photoUrl ? (
+              <Image source={{ uri: employee.photoUrl }} style={styles.heroAvatar} />
+            ) : (
+              <View style={[styles.heroAvatar, styles.heroAvatarFallback]}>
+                <Ionicons name="person" size={36} color="#9CA3AF" />
+              </View>
+            )}
           </View>
-        ) : null}
-        <View style={[styles.card, { marginTop: 12 }]}>
-          <Text style={styles.sectionTitle}>Quick reports</Text>
-          <TouchableOpacity style={styles.linkRow} onPress={() => navigation.navigate('OwnerEmployeeAttendance', { employee })}>
-            <Ionicons name="calendar-outline" size={20} color="#3B4FD7" /><Text style={styles.linkText}>Attendance</Text>
-            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.linkRow} onPress={() => navigation.navigate('OwnerEmployeeLeave', { employee })}>
-            <Ionicons name="person-outline" size={20} color="#3B4FD7" /><Text style={styles.linkText}>Leave details</Text>
-            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.linkRow, { borderBottomWidth: 0 }]} onPress={() => navigation.navigate('OwnerEmployeeSalaryReport', { employee })}>
-            <Ionicons name="document-text-outline" size={20} color="#3B4FD7" /><Text style={styles.linkText}>Salary report</Text>
-            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+          <Text style={styles.heroName}>{employee.name}</Text>
+          <Text style={styles.heroId}>ID: {empId}</Text>
+        </View>
+
+        {/* Check-in / Check-out */}
+        <View style={styles.viewCheckRow}>
+          <View style={[styles.viewCheckCard, styles.viewCheckCardLeft]}>
+            <Ionicons name="partly-sunny" size={28} color="#FACC15" />
+            <View style={styles.viewCheckTextWrap}>
+              <Text style={styles.viewCheckLabel}>CHECK IN</Text>
+              <Text style={[styles.viewCheckTime, { color: '#15803D' }]}>
+                {formatTime(employee.defaultCheckIn) || '—'}
+              </Text>
+            </View>
+          </View>
+          <View style={[styles.viewCheckCard, styles.viewCheckCardRight]}>
+            <Ionicons name="cloudy-night" size={28} color="#F97316" />
+            <View style={styles.viewCheckTextWrap}>
+              <Text style={styles.viewCheckLabel}>CHECK OUT</Text>
+              <Text style={[styles.viewCheckTime, { color: '#DC2626' }]}>
+                {formatTime(employee.defaultCheckOut) || '—'}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Categories grid */}
+        <Text style={styles.viewSectionHeader}>Categories</Text>
+        <View style={styles.catGrid}>
+          {CATEGORIES.map((c) => (
+            <TouchableOpacity
+              key={c.key}
+              style={styles.catItem}
+              onPress={() => navigation.navigate(c.route, { employee })}
+              activeOpacity={0.8}
+            >
+              <View style={styles.catIconWrap}>
+                <Ionicons name={c.icon} size={22} color="#FFFFFF" />
+              </View>
+              <Text style={styles.catLabel}>{c.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* This Month */}
+        <View style={styles.monthCard}>
+          <View style={styles.monthHeader}>
+            <Text style={styles.monthTitle}>This Month</Text>
+            <View style={styles.monthPill}>
+              <Ionicons name="calendar-outline" size={13} color="#3B4FD7" />
+              <Text style={styles.monthPillText}>{monthLabel}</Text>
+              <Ionicons name="chevron-down" size={12} color="#3B4FD7" />
+            </View>
+          </View>
+
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${presentPct * 100}%` }]} />
+          </View>
+          <View style={styles.progressLegend}>
+            <Text style={styles.progressLegendOn}>{presentDays} Present</Text>
+            <Text style={styles.progressLegendOff}>{presentDays}/{daysInMonth}</Text>
+          </View>
+
+          <View style={styles.statTilesRow}>
+            <View style={[styles.statTile, { backgroundColor: '#EFF6FF' }]}>
+              <Ionicons name="calendar-outline" size={16} color="#3B4FD7" />
+              <Text style={styles.statTileValue}>{presentDays}</Text>
+              <Text style={styles.statTileLabel}>Present</Text>
+            </View>
+            <View style={[styles.statTile, { backgroundColor: '#FFF7ED' }]}>
+              <Ionicons name="briefcase-outline" size={16} color="#F97316" />
+              <Text style={styles.statTileValue}>{String(attendanceSummary?.leaveDays ?? 0).padStart(2, '0')}</Text>
+              <Text style={styles.statTileLabel}>Leave</Text>
+            </View>
+            <View style={[styles.statTile, { backgroundColor: '#EFF6FF' }]}>
+              <Ionicons name="calendar-outline" size={16} color="#3B4FD7" />
+              <Text style={styles.statTileValue}>{String(attendanceSummary?.permissionCount ?? 0).padStart(2, '0')}</Text>
+              <Text style={styles.statTileLabel}>Permission</Text>
+            </View>
+            <View style={[styles.statTile, { backgroundColor: '#EFF6FF' }]}>
+              <Ionicons name="time-outline" size={16} color="#3B4FD7" />
+              <Text style={styles.statTileValue}>{attendanceSummary?.lateHours ?? '0'}</Text>
+              <Text style={styles.statTileLabel}>Late Hrs</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Recent Salary Advance */}
+        <View style={styles.recentHeaderRow}>
+          <Text style={styles.viewSectionHeader}>Recent Salary Advance</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('OwnerEmployeeAddAdvance', { employee })}>
+            <Text style={styles.recentAddLink}>+ Add</Text>
           </TouchableOpacity>
         </View>
-        <View style={[styles.card, { marginTop: 12 }]}>
-          <Text style={styles.sectionTitle}>Login</Text>
-          <Text style={styles.meta}>
-            {employee.userId ? 'Employee has app login (email + password).' : 'No app login — add with email & password when creating staff.'}
-          </Text>
-          <Text style={[styles.meta, { marginTop: 8, fontStyle: 'italic', color: '#6B7280' }]}>Set mPIN — Coming soon</Text>
+        {recentAdvance ? (
+          <View style={styles.recentItemCard}>
+            <View style={styles.recentAccent} />
+            <View style={styles.recentInner}>
+              <View style={styles.recentTopRow}>
+                <Text style={styles.recentDate}>{formatAdvanceDate(recentAdvance.advanceDate)}</Text>
+                <View style={styles.statusPillRow}>
+                  <View style={[styles.statusPill, isPaid ? styles.statusPillOn : styles.statusPillDimGreen]}>
+                    <Text style={[styles.statusPillText, isPaid ? styles.statusPillTextOn : styles.statusPillTextDim]}>
+                      Paid
+                    </Text>
+                  </View>
+                  <View style={[styles.statusPill, !isPaid ? styles.statusPillOnRed : styles.statusPillDimRed]}>
+                    <Text style={[styles.statusPillText, !isPaid ? styles.statusPillTextOn : styles.statusPillTextDim]}>
+                      Not Paid
+                    </Text>
+                  </View>
+                </View>
+              </View>
+              <View style={styles.recentBottomRow}>
+                <View style={styles.recentBottomCol}>
+                  <Text style={styles.recentBigValue}>₹ {recentAdvance.amount ?? 0}</Text>
+                  <Text style={styles.recentSubLabel}>Advance Amount</Text>
+                </View>
+                <View style={styles.recentBottomCol}>
+                  <Text style={styles.recentBigValue}>
+                    {recentAdvance.requestedAt
+                      ? new Date(recentAdvance.requestedAt).toLocaleString('en-IN', {
+                          day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit',
+                        })
+                      : '—'}
+                  </Text>
+                  <Text style={styles.recentSubLabel}>Request Date &amp; Time</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        ) : (
+          <Text style={styles.emptyText}>No advances</Text>
+        )}
+
+        {/* Recent Leave Request */}
+        <Text style={styles.viewSectionHeader}>Recent Leave Request</Text>
+        {recentLeave ? (
+          <View style={styles.recentItemCard}>
+            <View style={styles.recentAccent} />
+            <View style={styles.recentInner}>
+              <View style={styles.recentTopRow}>
+                <Text style={styles.recentDate}>{formatLeaveDate(recentLeave.startDate)}</Text>
+                <View style={styles.statusPillRow}>
+                  <View style={[styles.statusPill, isApproved ? styles.statusPillOn : styles.statusPillDimGreen]}>
+                    <Text style={[styles.statusPillText, isApproved ? styles.statusPillTextOn : styles.statusPillTextDim]}>
+                      Approved
+                    </Text>
+                  </View>
+                  <View style={[styles.statusPill, isRejected ? styles.statusPillOnRed : styles.statusPillDimRed]}>
+                    <Text style={[styles.statusPillText, isRejected ? styles.statusPillTextOn : styles.statusPillTextDim]}>
+                      Rejected
+                    </Text>
+                  </View>
+                </View>
+              </View>
+              <View style={styles.recentBottomRow}>
+                <View style={styles.recentBottomCol}>
+                  <Text style={styles.recentBigValue}>{recentLeave.reason || 'Leave'}</Text>
+                  <Text style={styles.recentSubLabel}>Leave Reason</Text>
+                </View>
+                <View style={styles.recentBottomCol}>
+                  <Text style={styles.recentBigValue}>{recentLeave.appliedDaysLabel || '—'}</Text>
+                  <Text style={styles.recentSubLabel}>Applied Days</Text>
+                </View>
+                <View style={styles.recentBottomCol}>
+                  <Text style={styles.recentBigValue}>
+                    {recentLeave.requestedAt
+                      ? new Date(recentLeave.requestedAt).toLocaleString('en-IN', {
+                          day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit',
+                        })
+                      : '—'}
+                  </Text>
+                  <Text style={styles.recentSubLabel}>Request Date &amp; Time</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        ) : (
+          <Text style={styles.emptyText}>No leave requests</Text>
+        )}
+
+        {/* Compact contact footer */}
+        <View style={styles.viewFooterCard}>
+          <View style={styles.footerRow}>
+            <Ionicons name="briefcase-outline" size={14} color="#6B7280" />
+            <Text style={styles.footerText}>{employee.roleLabel || 'Technician'}</Text>
+          </View>
+          <View style={styles.footerRow}>
+            <Ionicons name="call-outline" size={14} color="#6B7280" />
+            <Text style={styles.footerText}>{employee.phone || '—'}</Text>
+          </View>
+          <View style={styles.footerRow}>
+            <Ionicons name="mail-outline" size={14} color="#6B7280" />
+            <Text style={styles.footerText}>{employee.email || '—'}</Text>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -551,4 +991,378 @@ const styles = StyleSheet.create({
   takePhotoBtn: { marginTop: 8, backgroundColor: '#22C55E', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
   takePhotoText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
   error: { fontSize: 14, color: '#DC2626' },
+
+  // Compact add-mode styles
+  addContent: { padding: 12, paddingBottom: 96 },
+  addCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+  },
+  addSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  addSectionTitle: { fontSize: 13, fontWeight: '700', color: '#111827' },
+  addLabel: { fontSize: 11, fontWeight: '600', color: '#374151', marginTop: 8, marginBottom: 4 },
+  req: { color: '#DC2626' },
+  addInput: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 13,
+    color: '#111827',
+    backgroundColor: '#FFFFFF',
+  },
+  addInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    backgroundColor: '#FFFFFF',
+  },
+  addInputRowText: { flex: 1, fontSize: 13, color: '#111827' },
+  addInputInline: { flex: 1, fontSize: 13, color: '#111827', padding: 0 },
+
+  addTwoCol: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
+  addColMain: { flex: 1 },
+  addColPhoto: { width: 108 },
+  photoBox: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: 10,
+    padding: 8,
+    alignItems: 'center',
+    gap: 6,
+  },
+  photoAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoPreview: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#E5E7EB' },
+  photoUploadingOverlay: {
+    position: 'absolute',
+    top: 8,
+    left: 0,
+    right: 0,
+    height: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderRadius: 30,
+    marginHorizontal: 24,
+  },
+  takePhotoBtnSm: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#22C55E',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  takePhotoTextSm: { color: '#FFFFFF', fontSize: 10, fontWeight: '700' },
+
+  addRow: { flexDirection: 'row', gap: 10 },
+  addRowItem: { flex: 1 },
+
+  idTabs: {
+    flexDirection: 'row',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    padding: 3,
+    gap: 3,
+  },
+  idTab: {
+    flex: 1,
+    paddingVertical: 7,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  idTabActive: { backgroundColor: '#FFFFFF', shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 2, shadowOffset: { width: 0, height: 1 } },
+  idTabText: { fontSize: 11, fontWeight: '600', color: '#6B7280' },
+  idTabTextActive: { color: '#111827' },
+  idUploadRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  idUploadTile: {
+    flex: 1,
+    height: 70,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderStyle: 'dashed',
+    backgroundColor: '#FAFAFA',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  idUploadText: { fontSize: 10, color: '#6B7280', fontWeight: '600' },
+  idUploadPreview: { ...StyleSheet.absoluteFillObject, borderRadius: 8 },
+  idUploadBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 999,
+  },
+  idUploadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 8,
+  },
+  idUploadingText: { color: '#FFFFFF', fontSize: 10, fontWeight: '600' },
+  idUploadedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#F0FDF4',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    marginTop: 8,
+  },
+  idUploadedText: { flex: 1, fontSize: 11, color: '#15803D', fontWeight: '600' },
+
+  otpHint: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    backgroundColor: '#EEF2FF',
+    borderRadius: 8,
+    padding: 8,
+    marginTop: 10,
+  },
+  otpHintText: { flex: 1, fontSize: 11, color: '#3B4FD7', lineHeight: 15 },
+
+  salaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    gap: 8,
+  },
+  salaryLabel: { fontSize: 12, color: '#374151', fontWeight: '500', flexShrink: 0 },
+  salaryInputWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 7,
+    minWidth: 0,
+  },
+  salaryCurrency: { fontSize: 13, color: '#6B7280', marginRight: 4 },
+  salaryInput: { flex: 1, fontSize: 13, color: '#111827', padding: 0, minWidth: 0 },
+
+  footerBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  footerCancel: {
+    flex: 1,
+    paddingVertical: 11,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  footerCancelText: { fontSize: 13, fontWeight: '700', color: '#374151' },
+  footerCreate: {
+    flex: 1.4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 11,
+    borderRadius: 999,
+    backgroundColor: '#22C55E',
+  },
+  footerCreateText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+
+  // ===== View-mode (mockup-matching) =====
+  viewContent: { padding: 12, paddingBottom: 24 },
+
+  heroCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingTop: 14,
+    paddingBottom: 14,
+    alignItems: 'center',
+    position: 'relative',
+  },
+  heroStatus: {
+    position: 'absolute',
+    top: 10,
+    right: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  heroStatusLabel: { fontSize: 12, color: '#374151', fontWeight: '600' },
+  heroStatusValue: { fontSize: 12, fontWeight: '700' },
+  statusOk: { color: '#22C55E' },
+  statusOff: { color: '#9CA3AF' },
+  heroAvatarWrap: { marginBottom: 8, marginTop: 2 },
+  heroAvatar: { width: 92, height: 92, borderRadius: 46, backgroundColor: '#E5E7EB' },
+  heroAvatarFallback: { alignItems: 'center', justifyContent: 'center' },
+  heroName: { fontSize: 16, fontWeight: '700', color: '#111827' },
+  heroId: { fontSize: 11, color: '#6B7280', marginTop: 2, letterSpacing: 0.4 },
+
+  viewCheckRow: { flexDirection: 'row', gap: 10, marginTop: 10 },
+  viewCheckCard: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    gap: 8,
+  },
+  viewCheckCardLeft: {},
+  viewCheckCardRight: {},
+  viewCheckTextWrap: { flex: 1 },
+  viewCheckLabel: { fontSize: 10, color: '#6B7280', fontWeight: '700', letterSpacing: 0.5 },
+  viewCheckTime: { fontSize: 16, fontWeight: '800', marginTop: 1 },
+
+  viewSectionHeader: { fontSize: 13, fontWeight: '700', color: '#111827', marginTop: 14, marginBottom: 8 },
+
+  catGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    rowGap: 12,
+  },
+  catItem: {
+    width: '22%',
+    alignItems: 'center',
+  },
+  catIconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#1E3A8A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  catLabel: { fontSize: 10, fontWeight: '600', color: '#374151', textAlign: 'center', lineHeight: 13 },
+
+  monthCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 12,
+  },
+  monthHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  monthTitle: { fontSize: 14, fontWeight: '700', color: '#111827' },
+  monthPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  monthPillText: { fontSize: 11, fontWeight: '700', color: '#3B4FD7' },
+
+  progressTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#E5E7EB',
+    overflow: 'hidden',
+  },
+  progressFill: { height: '100%', backgroundColor: '#3B4FD7' },
+  progressLegend: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 6,
+  },
+  progressLegendOn: { fontSize: 12, color: '#3B4FD7', fontWeight: '700' },
+  progressLegendOff: { fontSize: 12, color: '#6B7280', fontWeight: '600' },
+
+  statTilesRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  statTile: {
+    flex: 1,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    alignItems: 'flex-start',
+  },
+  statTileValue: { fontSize: 16, fontWeight: '800', color: '#111827', marginTop: 4 },
+  statTileLabel: { fontSize: 10, color: '#6B7280', fontWeight: '600', marginTop: 1 },
+
+  recentHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  recentAddLink: { fontSize: 12, color: '#3B4FD7', fontWeight: '700', marginTop: 14 },
+
+  recentItemCard: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  recentAccent: { width: 3, backgroundColor: '#7C3AED' },
+  recentInner: { flex: 1, padding: 10 },
+  recentTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  recentDate: { fontSize: 12, fontWeight: '700', color: '#111827' },
+  statusPillRow: { flexDirection: 'row', gap: 6 },
+  statusPill: {
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  statusPillOn: { backgroundColor: '#22C55E' },
+  statusPillOnRed: { backgroundColor: '#EF4444' },
+  statusPillDimGreen: { backgroundColor: '#DCFCE7' },
+  statusPillDimRed: { backgroundColor: '#FEE2E2' },
+  statusPillText: { fontSize: 10, fontWeight: '700' },
+  statusPillTextOn: { color: '#FFFFFF' },
+  statusPillTextDim: { color: '#9CA3AF' },
+
+  recentBottomRow: { flexDirection: 'row', marginTop: 10, gap: 10 },
+  recentBottomCol: { flex: 1 },
+  recentBigValue: { fontSize: 12, fontWeight: '700', color: '#111827' },
+  recentSubLabel: { fontSize: 10, color: '#9CA3AF', marginTop: 2 },
+
+  emptyText: { fontSize: 12, color: '#6B7280', textAlign: 'center', paddingVertical: 16 },
+
+  viewFooterCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 14,
+    gap: 8,
+  },
+  footerRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  footerText: { fontSize: 12, color: '#374151' },
 });
