@@ -17,6 +17,7 @@ const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 const DOW = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 // Color tokens — match the mockup's dot legend.
 const STATUS_COLORS = {
@@ -296,7 +297,7 @@ function DayCard({ day }) {
           </View>
           <View style={styles.dayCol}>
             <Text style={[styles.dayColValue, isLate && styles.dayColValueLate]}>
-              {day.workingHours || '—'}
+              {day.workingHours && day.workingHours !== '0' ? day.workingHours : '—'}
             </Text>
             <Text style={styles.dayColLabel}>Working HR's</Text>
           </View>
@@ -318,9 +319,16 @@ function formatTime12(t) {
 
 function formatDateLabel(day) {
   if (!day?.date) return day?.dayLabel || '—';
-  const d = new Date(day.date);
+  // Parse ISO YYYY-MM-DD locally so the day-of-week doesn't drift by a day under
+  // negative-offset timezones (new Date('2026-06-06') is UTC midnight).
+  const parts = String(day.date).split('-');
+  const y = Number(parts[0]);
+  const m = Number(parts[1]);
+  const dd = Number(parts[2]);
+  if (!y || !m || !dd) return day?.dayLabel || '—';
+  const d = new Date(y, m - 1, dd);
   const dow = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
-  return `${dow}, ${pad2(d.getDate())} ${d.getFullYear()}`;
+  return `${dow}, ${pad2(dd)} ${MONTHS_SHORT[m - 1]} ${y}`;
 }
 
 const styles = StyleSheet.create({

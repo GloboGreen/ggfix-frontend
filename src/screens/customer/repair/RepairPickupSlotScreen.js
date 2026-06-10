@@ -94,13 +94,17 @@ export default function RepairPickupSlotScreen({ navigation, route }) {
 
   if (loading) return <Loader label="Loading slots..." />;
 
-  const slotsToShow = slots.length ? slots : [
+  // Backend stores dayOfWeek as ISO 1..7 (Mon..Sun); null means any-day.
+  // JS Date.getDay() is 0=Sun..6=Sat — convert to ISO before matching.
+  const isoDow = ((days[dayIdx].getDay() + 6) % 7) + 1;
+  const slotsForDay = slots.filter((s) => s.dayOfWeek == null || s.dayOfWeek === isoDow);
+  const slotsToShow = slotsForDay.length ? slotsForDay : (slots.length ? [] : [
     { startTime: '09:00', endTime: '11:00' },
     { startTime: '11:00', endTime: '13:00' },
     { startTime: '13:00', endTime: '15:00' },
     { startTime: '15:00', endTime: '17:00' },
     { startTime: '17:00', endTime: '19:00' },
-  ];
+  ]);
 
   return (
     <View className="flex-1 bg-background">
@@ -132,7 +136,7 @@ export default function RepairPickupSlotScreen({ navigation, route }) {
               return (
                 <Pressable
                   key={i}
-                  onPress={() => setDayIdx(i)}
+                  onPress={() => { setDayIdx(i); setSlot(null); }}
                   className={`mr-2 px-4 py-2.5 rounded-2xl border min-w-[64px] items-center ${active ? 'bg-primary border-primary' : 'bg-card border-border'}`}
                 >
                   <Text className={`text-[10px] font-bold tracking-widest ${active ? 'text-white/85' : 'text-text-muted'}`}>

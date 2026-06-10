@@ -35,6 +35,10 @@ function bucketize(status) {
   ) return 'COMPLETED';
   if (
     s === 'PICKED_UP'
+    || s === 'DEVICE_PICKED_UP'
+    || s === 'REPAIR_ESTIMATE_PROCESSING'
+    || s === 'REACHED_SHOP'
+    || s === 'RECEIVED_AT_SHOP'
     || s === 'IN_TRANSIT'
     || s === 'AT_SHOP'
     || s === 'IN_SERVICE'
@@ -58,7 +62,7 @@ function formatDateTime(instant) {
 }
 
 function trackingId(b) {
-  return b.trackingId || b.ticketCode || `CSPEN${String(b.id || '').replace(/[^0-9]/g, '').slice(0, 8) || '——'}`;
+  return b.bookingNumber || b.trackingId || b.ticketCode || `CSPEN${String(b.id || '').replace(/[^0-9]/g, '').slice(0, 8) || '--'}`;
 }
 
 // Build a short address line: 1st 30 chars of the pickup address or fallback.
@@ -331,7 +335,7 @@ function PickupCard({ booking, bucket, onPress, onRefresh, refreshing }) {
       <View style={styles.pickupInner}>
         <View style={styles.pickupTopRow}>
           <Text style={styles.pickupDate}>{datePart}</Text>
-          <Text style={styles.pickupTracking}>#{trackingId(booking)}</Text>
+          <Text style={styles.pickupTracking}>{trackingId(booking)}</Text>
         </View>
 
         <View style={styles.pickupMetaRow}>

@@ -15,6 +15,7 @@ import {
 import { listMyOrders, getRepairBooking, getSellOrder } from '../../../api/orders';
 import { getShop } from '../../../api/shops';
 import { getBrands, getModelsByBrand, getRamOptions, getStorageOptions } from '../../../api/masterData';
+import { cleanIssueSummary } from '../../../utils/pickupEstimateMeta';
 
 const TABS = [
   { key: 'Buy',     label: 'Buy',     icon: ShoppingBag,   color: '#7C3AED', bg: 'bg-primary/10' },
@@ -156,7 +157,7 @@ export default function MyOrdersScreen({ navigation }) {
         const bkServices = (bk?.services || []).map((s) => s?.serviceName).filter(Boolean);
         const payloadServices = (p.services || []).map((s) => s?.serviceName || s?.name).filter(Boolean);
         const services = bkServices.length ? bkServices : payloadServices;
-        const issueSummary = bk?.issueSummary || p.issueSummary;
+        const issueSummary = cleanIssueSummary(bk?.issueSummary || p.issueSummary);
         const model = await modelFor(brandId, modelId);
         const brandName = brandById[brandId]?.name;
         const ramStorage = [ramById[ramOptionId]?.label, storageById[storageOptionId]?.label].filter(Boolean).join(' / ');
@@ -340,7 +341,12 @@ export default function MyOrdersScreen({ navigation }) {
                   </View>
                   <View className="items-end">
                     <Badge variant={variant}>{
-                      (tab === 'Service' && o.phaseLabel)
+                      // Service AND Pickup tabs both back onto the same
+                      // repair_booking_events timeline — show the live
+                      // phaseLabel so a card that's already at "Reached
+                      // shop" / "Received at shop" doesn't keep reading
+                      // the stale customer_orders.status ("PENDING").
+                      ((tab === 'Service' || tab === 'Pickup') && o.phaseLabel)
                         ? o.phaseLabel
                         : (o.status || '').replace(/_/g, ' ')
                     }</Badge>
@@ -446,12 +452,32 @@ export default function MyOrdersScreen({ navigation }) {
                       <Clock size={11} color="#2563EB" />
                       <Text className="ml-1 text-[10px] font-bold text-secondary">{tab === 'Pickup' ? 'History' : 'Track'}</Text>
                     </Pressable>
-                    {tab === 'Pickup' ? (
-                      <Pressable onPress={() => onReschedule(o)} className="flex-1 flex-row items-center justify-center py-1 active:opacity-70 border-l border-border">
-                        <CalendarClock size={11} color="#F59E0B" />
-                        <Text className="ml-1 text-[10px] font-bold text-warning">Re-Schedule</Text>
-                      </Pressable>
-                    ) : (
+                    {tab === 'Pickup' ? (() => {
+                      // Re-Schedule only makes sense before the pickup agent
+                      // actually starts moving. Once we've seen any later
+                      // step (on-the-way, picked up, reached shop, …) the
+                      // customer can't reschedule — they can still tap
+                      // History to track progress in the slot.
+                      const live = String(o.phaseStatus || o.status || '').toUpperCase();
+                      const reschedulable = !live
+                        || live === 'PENDING'
+                        || live === 'ORDER_PLACED'
+                        || live === 'PICKUP_REQUESTED'
+                        || live === 'PICKUP_ACCEPTED'
+                        || live === 'ORDER_SERVICE_CONFIRMED'
+                        || live === 'SERVICE_ACCEPTED';
+                      return reschedulable ? (
+                        <Pressable onPress={() => onReschedule(o)} className="flex-1 flex-row items-center justify-center py-1 active:opacity-70 border-l border-border">
+                          <CalendarClock size={11} color="#F59E0B" />
+                          <Text className="ml-1 text-[10px] font-bold text-warning">Re-Schedule</Text>
+                        </Pressable>
+                      ) : (
+                        <Pressable onPress={() => openReceipt(o)} className="flex-1 flex-row items-center justify-center py-1 active:opacity-70 border-l border-border">
+                          <Receipt size={11} color="#10B981" />
+                          <Text className="ml-1 text-[10px] font-bold text-success">Receipt</Text>
+                        </Pressable>
+                      );
+                    })() : (
                       <Pressable onPress={() => (REPAIR_TABS.has(tab) ? openReceipt(o) : openOrder(o))} className="flex-1 flex-row items-center justify-center py-1 active:opacity-70 border-l border-border">
                         <Receipt size={11} color="#10B981" />
                         <Text className="ml-1 text-[10px] font-bold text-success">Receipt</Text>

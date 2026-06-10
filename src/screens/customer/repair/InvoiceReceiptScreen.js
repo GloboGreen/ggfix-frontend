@@ -5,6 +5,7 @@ import { getRepairBooking } from '../../../api/orders';
 import { getShop } from '../../../api/shops';
 import { getProfile, listAddresses } from '../../../api/customer';
 import { resolveBookingDevice } from '../../../utils/bookingDevice';
+import { cleanIssueSummary } from '../../../utils/pickupEstimateMeta';
 
 const GST_RATE = 0.18; // 18% repair-service GST, split CGST 9% + SGST 9%
 const money = (n) => Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -140,7 +141,7 @@ export default function InvoiceReceiptScreen({ route }) {
           <View className="bg-card border border-border rounded-2xl p-3 mb-3">
             <Text className="text-[12px] font-extrabold text-text" numberOfLines={2}>{dev.name || 'Device'}</Text>
             {dev.specs ? <Text className="text-[10px] text-text-muted mt-0.5">{dev.specs}</Text> : null}
-            {b.issueSummary ? <Text className="text-[10px] text-text-muted mt-1">Complaint : {b.issueSummary}</Text> : null}
+            {(() => { const ci = cleanIssueSummary(b.issueSummary); return ci ? <Text className="text-[10px] text-text-muted mt-1">Complaint : {ci}</Text> : null; })()}
           </View>
 
           {/* Line items table (horizontal scroll for the wide GST columns) */}

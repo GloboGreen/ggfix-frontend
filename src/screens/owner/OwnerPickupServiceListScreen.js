@@ -9,13 +9,23 @@ import { listShopRepairBookings } from '../../api/orders';
 const STATUS_FILTERS = [
   { key: 'ALL',          label: 'All' },
   { key: 'ACTIVE',       label: 'Active' },
-  { key: 'ORDER_PLACED', label: 'New' },
+  { key: 'NEW',          label: 'New' },
   { key: 'COMPLETED',    label: 'Completed' },
   { key: 'CANCELLED',    label: 'Cancelled' },
 ];
 
 const STATUS_VARIANT = {
   ORDER_PLACED: { variant: 'softWarning', label: 'New Request' },
+  PICKUP_REQUESTED: { variant: 'softWarning', label: 'Pickup Requested' },
+  PICKUP_ACCEPTED: { variant: 'softPrimary', label: 'Pickup Accepted' },
+  ORDER_SERVICE_CONFIRMED: { variant: 'softPrimary', label: 'Confirmed' },
+  PICKUP_PERSON_ASSIGNED: { variant: 'softPrimary', label: 'Pickup Assigned' },
+  PICKUP_ASSIGNED: { variant: 'softPrimary', label: 'Pickup Assigned' },
+  PICKUP_ON_THE_WAY: { variant: 'softSecondary', label: 'On The Way' },
+  REPAIR_ESTIMATE_PROCESSING: { variant: 'softWarning', label: 'Estimate Submitted' },
+  DEVICE_PICKED_UP: { variant: 'softSecondary', label: 'Device Picked Up' },
+  PICKED_UP: { variant: 'softSecondary', label: 'Device Picked Up' },
+  REACHED_SHOP: { variant: 'softSuccess', label: 'Reached Shop' },
   ACCEPTED:     { variant: 'softPrimary', label: 'Accepted' },
   IN_TRANSIT:   { variant: 'softSecondary', label: 'In Transit' },
   COMPLETED:    { variant: 'softSuccess', label: 'Completed' },
@@ -154,6 +164,8 @@ export default function OwnerPickupServiceListScreen({ navigation }) {
               const s = (b.status || '').toUpperCase();
               return s !== 'COMPLETED' && s !== 'CANCELLED' && s !== 'DELIVERED';
             })
+          : statusFilter === 'NEW'
+            ? pickups.filter((b) => ['ORDER_PLACED', 'PICKUP_REQUESTED'].includes((b.status || '').toUpperCase()))
           : pickups.filter((b) => (b.status || '').toUpperCase() === statusFilter);
       setItems(filtered);
     } catch (e) {
@@ -168,12 +180,12 @@ export default function OwnerPickupServiceListScreen({ navigation }) {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const counts = useMemo(() => {
-    const c = { ALL: items.length, ACTIVE: 0, ORDER_PLACED: 0, COMPLETED: 0, CANCELLED: 0 };
+    const c = { ALL: items.length, ACTIVE: 0, NEW: 0, COMPLETED: 0, CANCELLED: 0 };
     for (const it of items) {
       const s = (it.status || '').toUpperCase();
       if (s === 'COMPLETED') c.COMPLETED += 1;
       else if (s === 'CANCELLED') c.CANCELLED += 1;
-      else { c.ACTIVE += 1; if (s === 'ORDER_PLACED') c.ORDER_PLACED += 1; }
+      else { c.ACTIVE += 1; if (s === 'ORDER_PLACED' || s === 'PICKUP_REQUESTED') c.NEW += 1; }
     }
     return c;
   }, [items]);

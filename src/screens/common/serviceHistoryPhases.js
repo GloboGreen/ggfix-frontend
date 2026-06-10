@@ -7,7 +7,17 @@
 import React from 'react';
 import { Text, View } from 'react-native';
 
+// The first six rows are the doorstep-pickup sub-flow — they only light up
+// for serviceMode=PICKUP bookings. Walk-in bookings skip past them, so a
+// timeline that never emits PICKUP_PERSON_ASSIGNED simply shows those rows
+// as inactive (gray dot, no timestamp) and starts at BOOKING_CREATED_BY_SHOP.
 export const SHOP_BOOKING_STATUS_OPTIONS = [
+  { value: 'PICKUP_PERSON_ASSIGNED',                        label: 'Pickup Person Assigned' },
+  { value: 'PICKUP_ON_THE_WAY',                             label: 'Pickup Person On The Way' },
+  { value: 'REPAIR_ESTIMATE_PROCESSING',                    label: 'Repair Estimate Processing' },
+  { value: 'DEVICE_PICKED_UP',                              label: 'Device Picked Up' },
+  { value: 'REACHED_SHOP',                                  label: 'Pickup Person Reached Shop' },
+  { value: 'RECEIVED_AT_SHOP',                              label: 'Device Received at Shop' },
   { value: 'BOOKING_CREATED_BY_SHOP',                       label: 'Booking Created by Shop' },
   { value: 'SERVICE_ACCEPTED',                              label: 'Service Accepted' },
   { value: 'ASSIGNED_TO_TECHNICIAN',                        label: 'Assigned to Technician' },

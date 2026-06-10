@@ -23,7 +23,6 @@ import { uploadMedia } from '../../api/masterData';
 import { selectShopId } from '../../store/authSlice';
 
 const ROLES = ['Technician', 'Staff', 'Pickup Person'];
-const ID_TYPES = ['Aadhar', 'PAN'];
 const SALARY_PERIODS = ['Monthly', 'Weekly'];
 
 export default function OwnerEmployeeDetailScreen({ route, navigation }) {
@@ -37,26 +36,64 @@ export default function OwnerEmployeeDetailScreen({ route, navigation }) {
     if (isEdit) navigation.setOptions?.({ title: 'Edit Profile' });
   }, [isEdit, navigation]);
 
+  useEffect(() => {
+    if (!isEdit || !employee?.id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const fresh = await ticketApi.get(`/technicians/${employee.id}`);
+        if (cancelled || !fresh) return;
+        setForm((p) => ({
+          ...p,
+          name: fresh.name ?? p.name,
+          phone: fresh.phone ?? p.phone,
+          email: fresh.email ?? p.email,
+          roleLabel: fresh.roleLabel ?? p.roleLabel,
+          salaryAmount: fresh.salaryAmount ?? p.salaryAmount,
+          salaryPeriod: fresh.salaryPeriod ?? p.salaryPeriod,
+          dateOfBirth: fresh.dateOfBirth ?? p.dateOfBirth,
+          dateOfJoin: fresh.dateOfJoin ?? p.dateOfJoin,
+          defaultCheckIn: fresh.defaultCheckIn ?? p.defaultCheckIn,
+          defaultCheckOut: fresh.defaultCheckOut ?? p.defaultCheckOut,
+          photoUrl: fresh.photoUrl ?? p.photoUrl,
+          dailyWage: fresh.dailyWage ?? p.dailyWage,
+          aadharNumber: fresh.aadharNumber ?? p.aadharNumber,
+          aadharFrontUrl: fresh.aadharFrontUrl ?? p.aadharFrontUrl,
+          aadharBackUrl: fresh.aadharBackUrl ?? p.aadharBackUrl,
+          panNumber: fresh.panNumber ?? p.panNumber,
+          panFrontUrl: fresh.panFrontUrl ?? p.panFrontUrl,
+          panBackUrl: fresh.panBackUrl ?? p.panBackUrl,
+        }));
+      } catch (_) {}
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isEdit, employee?.id]);
+
   const [active, setActive] = useState(employee?.isAvailable !== false);
   const [saving, setSaving] = useState(false);
+  const [roleOpen, setRoleOpen] = useState(false);
   const [form, setForm] = useState({
     name: employee?.name ?? '',
     phone: employee?.phone ?? '',
     email: employee?.email ?? '',
     password: '',
-    roleLabel: employee?.roleLabel ?? 'Technician',
+    roleLabel: employee?.roleLabel ?? '',
     salaryAmount: employee?.salaryAmount ?? '',
     salaryPeriod: employee?.salaryPeriod ?? 'Monthly',
-    idVerificationType: employee?.idVerificationType ?? '',
-    idNumber: employee?.idNumber ?? '',
     dateOfBirth: employee?.dateOfBirth ?? '',
     dateOfJoin: employee?.dateOfJoin ?? '',
     defaultCheckIn: employee?.defaultCheckIn ?? '09:30',
     defaultCheckOut: employee?.defaultCheckOut ?? '18:30',
     photoUrl: employee?.photoUrl ?? '',
     dailyWage: employee?.dailyWage ?? '',
-    idFrontUrl: employee?.idFrontUrl ?? '',
-    idBackUrl: employee?.idBackUrl ?? '',
+    aadharNumber: employee?.aadharNumber ?? '',
+    aadharFrontUrl: employee?.aadharFrontUrl ?? '',
+    aadharBackUrl: employee?.aadharBackUrl ?? '',
+    panNumber: employee?.panNumber ?? '',
+    panFrontUrl: employee?.panFrontUrl ?? '',
+    panBackUrl: employee?.panBackUrl ?? '',
   });
 
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
@@ -65,8 +102,10 @@ export default function OwnerEmployeeDetailScreen({ route, navigation }) {
 
   const FOLDER_FOR = {
     photoUrl: 'employees',
-    idFrontUrl: 'employee-ids',
-    idBackUrl: 'employee-ids',
+    aadharFrontUrl: 'employee-ids',
+    aadharBackUrl: 'employee-ids',
+    panFrontUrl: 'employee-ids',
+    panBackUrl: 'employee-ids',
   };
 
   const pickImage = async (field, fromCamera) => {
@@ -149,6 +188,7 @@ export default function OwnerEmployeeDetailScreen({ route, navigation }) {
               email: form.email.trim(),
               password: form.password,
               name: form.name.trim(),
+              roleLabel: (form.roleLabel && form.roleLabel.trim()) || null,
             },
           });
           userId = authRes?.userId;
@@ -192,8 +232,6 @@ export default function OwnerEmployeeDetailScreen({ route, navigation }) {
         return;
       }
       const photoUrl = form.photoUrl;
-      const idFrontUrl = form.idFrontUrl;
-      const idBackUrl = form.idBackUrl;
 
       const withLogin = !!userId;
       const body = {
@@ -203,16 +241,18 @@ export default function OwnerEmployeeDetailScreen({ route, navigation }) {
         roleLabel: (form.roleLabel && form.roleLabel.trim()) || null,
         salaryAmount: (form.salaryAmount && form.salaryAmount.trim()) || null,
         salaryPeriod: (form.salaryPeriod && form.salaryPeriod.trim()) || null,
-        idVerificationType: (form.idVerificationType && form.idVerificationType.trim()) || null,
-        idNumber: (form.idNumber && form.idNumber.trim()) || null,
         dateOfBirth: (form.dateOfBirth && form.dateOfBirth.trim()) || null,
         dateOfJoin: (form.dateOfJoin && form.dateOfJoin.trim()) || null,
         defaultCheckIn: (form.defaultCheckIn && form.defaultCheckIn.trim()) || null,
         defaultCheckOut: (form.defaultCheckOut && form.defaultCheckOut.trim()) || null,
         photoUrl: (photoUrl && photoUrl.trim()) || null,
         dailyWage: (form.dailyWage && String(form.dailyWage).trim()) || null,
-        idFrontUrl: (idFrontUrl && idFrontUrl.trim()) || null,
-        idBackUrl: (idBackUrl && idBackUrl.trim()) || null,
+        aadharNumber: (form.aadharNumber && form.aadharNumber.trim()) || null,
+        aadharFrontUrl: (form.aadharFrontUrl && form.aadharFrontUrl.trim()) || null,
+        aadharBackUrl: (form.aadharBackUrl && form.aadharBackUrl.trim()) || null,
+        panNumber: (form.panNumber && form.panNumber.trim().toUpperCase()) || null,
+        panFrontUrl: (form.panFrontUrl && form.panFrontUrl.trim()) || null,
+        panBackUrl: (form.panBackUrl && form.panBackUrl.trim()) || null,
       };
       if (userId) body.userId = userId;
       const created = await ticketApi.post('/technicians', {
@@ -254,16 +294,18 @@ export default function OwnerEmployeeDetailScreen({ route, navigation }) {
         roleLabel: (form.roleLabel && form.roleLabel.trim()) || null,
         salaryAmount: (form.salaryAmount && String(form.salaryAmount).trim()) || null,
         salaryPeriod: (form.salaryPeriod && form.salaryPeriod.trim()) || null,
-        idVerificationType: (form.idVerificationType && form.idVerificationType.trim()) || null,
-        idNumber: (form.idNumber && form.idNumber.trim()) || null,
         dateOfBirth: (form.dateOfBirth && form.dateOfBirth.trim()) || null,
         dateOfJoin: (form.dateOfJoin && form.dateOfJoin.trim()) || null,
         defaultCheckIn: (form.defaultCheckIn && form.defaultCheckIn.trim()) || null,
         defaultCheckOut: (form.defaultCheckOut && form.defaultCheckOut.trim()) || null,
         photoUrl: (form.photoUrl && form.photoUrl.trim()) || null,
         dailyWage: (form.dailyWage && String(form.dailyWage).trim()) || null,
-        idFrontUrl: (form.idFrontUrl && form.idFrontUrl.trim()) || null,
-        idBackUrl: (form.idBackUrl && form.idBackUrl.trim()) || null,
+        aadharNumber: (form.aadharNumber && form.aadharNumber.trim()) || null,
+        aadharFrontUrl: (form.aadharFrontUrl && form.aadharFrontUrl.trim()) || null,
+        aadharBackUrl: (form.aadharBackUrl && form.aadharBackUrl.trim()) || null,
+        panNumber: (form.panNumber && form.panNumber.trim().toUpperCase()) || null,
+        panFrontUrl: (form.panFrontUrl && form.panFrontUrl.trim()) || null,
+        panBackUrl: (form.panBackUrl && form.panBackUrl.trim()) || null,
       };
       await ticketApi.patch(`/technicians/${employee.id}`, { body });
       Alert.alert('Saved', 'Profile updated.');
@@ -408,18 +450,51 @@ export default function OwnerEmployeeDetailScreen({ route, navigation }) {
                 Employee Role <Text style={styles.req}>*</Text>
               </Text>
               <TouchableOpacity
-                style={styles.addInputRow}
-                onPress={() => {
-                  Alert.alert('Select Role', '', [
-                    ...ROLES.map((r) => ({ text: r, onPress: () => set('roleLabel', r) })),
-                    { text: 'Cancel', style: 'cancel' },
-                  ]);
-                }}
+                style={[styles.addInputRow, roleOpen && styles.addInputRowOpen]}
+                onPress={() => setRoleOpen((o) => !o)}
                 activeOpacity={0.7}
               >
                 <Text style={styles.addInputRowText}>{form.roleLabel || 'Select role'}</Text>
-                <Ionicons name="chevron-down" size={14} color="#6B7280" />
+                <Ionicons
+                  name={roleOpen ? 'chevron-up' : 'chevron-down'}
+                  size={14}
+                  color="#6B7280"
+                />
               </TouchableOpacity>
+              {roleOpen && (
+                <View style={styles.roleDropdown}>
+                  {ROLES.map((r, i) => {
+                    const selected = form.roleLabel === r;
+                    return (
+                      <TouchableOpacity
+                        key={r}
+                        style={[
+                          styles.roleOption,
+                          i < ROLES.length - 1 && styles.roleOptionDivider,
+                          selected && styles.roleOptionSelected,
+                        ]}
+                        onPress={() => {
+                          set('roleLabel', r);
+                          setRoleOpen(false);
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <Text
+                          style={[
+                            styles.roleOptionText,
+                            selected && styles.roleOptionTextSelected,
+                          ]}
+                        >
+                          {r}
+                        </Text>
+                        {selected && (
+                          <Ionicons name="checkmark" size={16} color="#3B4FD7" />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
             </View>
 
             {/* Dates + Shift */}
@@ -490,103 +565,117 @@ export default function OwnerEmployeeDetailScreen({ route, navigation }) {
                 <Text style={styles.addSectionTitle}>ID Verification</Text>
               </View>
 
-              <View style={styles.idTabs}>
-                {ID_TYPES.map((t) => {
-                  const active = form.idVerificationType === t;
-                  return (
+              {[
+                {
+                  label: 'Aadhar Card',
+                  numberField: 'aadharNumber',
+                  frontField: 'aadharFrontUrl',
+                  backField: 'aadharBackUrl',
+                  placeholder: 'Aadhar number (optional)',
+                  keyboardType: 'number-pad',
+                  maxLength: 12,
+                },
+                {
+                  label: 'PAN Card',
+                  numberField: 'panNumber',
+                  frontField: 'panFrontUrl',
+                  backField: 'panBackUrl',
+                  placeholder: 'PAN number (optional)',
+                  keyboardType: 'default',
+                  maxLength: 10,
+                },
+              ].map((doc) => (
+                <View key={doc.label} style={styles.idDocBlock}>
+                  <Text style={styles.idDocLabel}>{doc.label}</Text>
+                  <View style={styles.idUploadRow}>
                     <TouchableOpacity
-                      key={t}
-                      style={[styles.idTab, active && styles.idTabActive]}
-                      onPress={() => set('idVerificationType', t)}
-                      activeOpacity={0.8}
+                      style={styles.idUploadTile}
+                      activeOpacity={0.85}
+                      onPress={() => promptImageSource(doc.frontField)}
+                      disabled={!!uploading[doc.frontField]}
                     >
-                      <Text style={[styles.idTabText, active && styles.idTabTextActive]}>
-                        {t === 'Aadhar' ? 'Aadhar Card' : 'PAN Card'}
-                      </Text>
+                      {form[doc.frontField] ? (
+                        <>
+                          <Image
+                            source={{ uri: form[doc.frontField] }}
+                            style={styles.idUploadPreview}
+                          />
+                          <View style={styles.idUploadBadge}>
+                            <Ionicons name="checkmark-circle" size={14} color="#22C55E" />
+                          </View>
+                        </>
+                      ) : (
+                        <>
+                          <Ionicons name="cloud-upload-outline" size={20} color="#9CA3AF" />
+                          <Text style={styles.idUploadText}>Upload Front</Text>
+                        </>
+                      )}
+                      {uploading[doc.frontField] && (
+                        <View style={styles.idUploadingOverlay}>
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                          <Text style={styles.idUploadingText}>Uploading…</Text>
+                        </View>
+                      )}
                     </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              <View style={styles.idUploadRow}>
-                <TouchableOpacity
-                  style={styles.idUploadTile}
-                  activeOpacity={0.85}
-                  onPress={() => promptImageSource('idFrontUrl')}
-                  disabled={!!uploading.idFrontUrl}
-                >
-                  {form.idFrontUrl ? (
-                    <>
-                      <Image source={{ uri: form.idFrontUrl }} style={styles.idUploadPreview} />
-                      <View style={styles.idUploadBadge}>
-                        <Ionicons name="checkmark-circle" size={14} color="#22C55E" />
-                      </View>
-                    </>
-                  ) : (
-                    <>
-                      <Ionicons name="cloud-upload-outline" size={20} color="#9CA3AF" />
-                      <Text style={styles.idUploadText}>Upload Front</Text>
-                    </>
-                  )}
-                  {uploading.idFrontUrl && (
-                    <View style={styles.idUploadingOverlay}>
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                      <Text style={styles.idUploadingText}>Uploading…</Text>
+                    <TouchableOpacity
+                      style={styles.idUploadTile}
+                      activeOpacity={0.85}
+                      onPress={() => promptImageSource(doc.backField)}
+                      disabled={!!uploading[doc.backField]}
+                    >
+                      {form[doc.backField] ? (
+                        <>
+                          <Image
+                            source={{ uri: form[doc.backField] }}
+                            style={styles.idUploadPreview}
+                          />
+                          <View style={styles.idUploadBadge}>
+                            <Ionicons name="checkmark-circle" size={14} color="#22C55E" />
+                          </View>
+                        </>
+                      ) : (
+                        <>
+                          <Ionicons name="cloud-upload-outline" size={20} color="#9CA3AF" />
+                          <Text style={styles.idUploadText}>Upload Back</Text>
+                        </>
+                      )}
+                      {uploading[doc.backField] && (
+                        <View style={styles.idUploadingOverlay}>
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                          <Text style={styles.idUploadingText}>Uploading…</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                  {(form[doc.frontField] || form[doc.backField]) && (
+                    <View style={styles.idUploadedRow}>
+                      <Ionicons name="checkmark-circle" size={14} color="#22C55E" />
+                      <Text style={styles.idUploadedText}>
+                        {doc.label} uploaded successfully
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => {
+                          set(doc.frontField, '');
+                          set(doc.backField, '');
+                        }}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Ionicons name="trash-outline" size={14} color="#DC2626" />
+                      </TouchableOpacity>
                     </View>
                   )}
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.idUploadTile}
-                  activeOpacity={0.85}
-                  onPress={() => promptImageSource('idBackUrl')}
-                  disabled={!!uploading.idBackUrl}
-                >
-                  {form.idBackUrl ? (
-                    <>
-                      <Image source={{ uri: form.idBackUrl }} style={styles.idUploadPreview} />
-                      <View style={styles.idUploadBadge}>
-                        <Ionicons name="checkmark-circle" size={14} color="#22C55E" />
-                      </View>
-                    </>
-                  ) : (
-                    <>
-                      <Ionicons name="cloud-upload-outline" size={20} color="#9CA3AF" />
-                      <Text style={styles.idUploadText}>Upload Back</Text>
-                    </>
-                  )}
-                  {uploading.idBackUrl && (
-                    <View style={styles.idUploadingOverlay}>
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                      <Text style={styles.idUploadingText}>Uploading…</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              </View>
-              {(form.idFrontUrl || form.idBackUrl) && (
-                <View style={styles.idUploadedRow}>
-                  <Ionicons name="checkmark-circle" size={14} color="#22C55E" />
-                  <Text style={styles.idUploadedText}>
-                    {form.idVerificationType || 'ID'} uploaded successfully
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() => {
-                      set('idFrontUrl', '');
-                      set('idBackUrl', '');
-                    }}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Ionicons name="trash-outline" size={14} color="#DC2626" />
-                  </TouchableOpacity>
+                  <TextInput
+                    style={[styles.addInput, { marginTop: 4 }]}
+                    placeholder={doc.placeholder}
+                    placeholderTextColor="#9CA3AF"
+                    value={form[doc.numberField]}
+                    onChangeText={(v) => set(doc.numberField, v)}
+                    keyboardType={doc.keyboardType}
+                    maxLength={doc.maxLength}
+                    autoCapitalize={doc.label === 'PAN Card' ? 'characters' : 'none'}
+                  />
                 </View>
-              )}
-
-              <TextInput
-                style={[styles.addInput, { marginTop: 4 }]}
-                placeholder="ID number (optional)"
-                placeholderTextColor="#9CA3AF"
-                value={form.idNumber}
-                onChangeText={(v) => set('idNumber', v)}
-              />
+              ))}
             </View>
 
             {/* Salary Package */}
@@ -1080,6 +1169,35 @@ const styles = StyleSheet.create({
   },
   addInputRowText: { flex: 1, fontSize: 13, color: '#111827' },
   addInputInline: { flex: 1, fontSize: 13, color: '#111827', padding: 0 },
+  addInputRowOpen: {
+    borderColor: '#111827',
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+  },
+  roleDropdown: {
+    borderWidth: 1,
+    borderTopWidth: 0,
+    borderColor: '#111827',
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
+    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
+  },
+  roleOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    backgroundColor: '#FFFFFF',
+  },
+  roleOptionDivider: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F1F4',
+  },
+  roleOptionSelected: { backgroundColor: '#EEF2FF' },
+  roleOptionText: { fontSize: 13, color: '#111827' },
+  roleOptionTextSelected: { color: '#3B4FD7', fontWeight: '700' },
 
   addTwoCol: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
   addColMain: { flex: 1 },
@@ -1126,22 +1244,18 @@ const styles = StyleSheet.create({
   addRow: { flexDirection: 'row', gap: 10 },
   addRowItem: { flex: 1 },
 
-  idTabs: {
-    flexDirection: 'row',
-    backgroundColor: '#F3F4F6',
-    borderRadius: 8,
-    padding: 3,
-    gap: 3,
+  idDocBlock: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F1F4',
   },
-  idTab: {
-    flex: 1,
-    paddingVertical: 7,
-    borderRadius: 6,
-    alignItems: 'center',
+  idDocLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 4,
   },
-  idTabActive: { backgroundColor: '#FFFFFF', shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 2, shadowOffset: { width: 0, height: 1 } },
-  idTabText: { fontSize: 11, fontWeight: '600', color: '#6B7280' },
-  idTabTextActive: { color: '#111827' },
   idUploadRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
   idUploadTile: {
     flex: 1,

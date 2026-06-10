@@ -73,6 +73,8 @@ export default function ShopServiceStatusScreen({ navigation }) {
 
   if (loading) return <Loader label="Loading bookings..." />;
 
+  const serviceBookings = list.filter((bk) => !isPickupBooking(bk));
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="Update Service Status" onBack={() => navigation.goBack()} />
@@ -80,9 +82,9 @@ export default function ShopServiceStatusScreen({ navigation }) {
         contentContainerStyle={{ padding: 14, paddingBottom: 28 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00008B" />}
       >
-        {list.length === 0 ? (
+        {serviceBookings.length === 0 ? (
           <EmptyState title="No service bookings" description="Customer repair bookings for your shop will appear here." />
-        ) : list.map((bk) => {
+        ) : serviceBookings.map((bk) => {
           const services = (bk.services || []).map((s) => s.serviceName).filter(Boolean).join(', ');
           const isOpen = openId === bk.id;
           const statusUpper = (bk.status || '').toUpperCase();

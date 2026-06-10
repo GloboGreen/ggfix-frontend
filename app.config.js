@@ -13,10 +13,29 @@ export default {
     version: '1.0.0',
     platforms: ['ios', 'android', 'web'],
     orientation: 'portrait',
+    userInterfaceStyle: 'automatic',
     jsEngine: 'hermes',
     splash: { resizeMode: 'contain', backgroundColor: '#202124' },
-    ios: { supportsTablet: true },
-    android: { adaptiveIcon: { backgroundColor: '#202124' } },
+    ios: {
+      supportsTablet: true,
+      infoPlist: {
+        NSLocationWhenInUseUsageDescription:
+          'We use your location to show pickup-enabled repair shops nearby and to set your default delivery address.',
+      },
+    },
+    android: {
+      adaptiveIcon: { backgroundColor: '#202124' },
+      permissions: ['ACCESS_FINE_LOCATION', 'ACCESS_COARSE_LOCATION'],
+    },
+    plugins: [
+      [
+        'expo-location',
+        {
+          locationAlwaysAndWhenInUsePermission:
+            'We use your location to show pickup-enabled repair shops nearby.',
+        },
+      ],
+    ],
     extra: {
       API_HOST: host,
       API_BASE_URL: null,

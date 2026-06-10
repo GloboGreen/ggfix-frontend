@@ -1,15 +1,24 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, ScrollView, Text, View } from 'react-native';
+import { Alert, Image, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { Calendar, Clock, MapPin, FileText, User, IndianRupee, Hash, Truck, History, Phone, UserCheck, CheckCircle2 } from 'lucide-react-native';
+import { Calendar, Clock, MapPin, FileText, User, IndianRupee, Hash, Truck, History, Phone, UserCheck, CheckCircle2, Camera, Video } from 'lucide-react-native';
 import { Badge, Button, Loader, ScreenHeader } from '../../components/rnr';
-import { confirmShopRepairBooking, getShopRepairBooking } from '../../api/orders';
+import { confirmShopRepairBooking, getShopRepairBooking, markPickupReceivedAtShop } from '../../api/orders';
 
 const STATUS_VARIANT = {
   ORDER_PLACED:            { variant: 'softWarning',  label: 'New Request' },
+  PICKUP_REQUESTED:        { variant: 'softWarning',  label: 'Pickup Requested' },
+  PICKUP_ACCEPTED:         { variant: 'softPrimary',  label: 'Pickup Accepted' },
   ORDER_SERVICE_CONFIRMED: { variant: 'softPrimary',  label: 'Confirmed' },
+  PICKUP_PERSON_ASSIGNED:  { variant: 'softPrimary',  label: 'Pickup Assigned' },
   PICKUP_ASSIGNED:         { variant: 'softPrimary',  label: 'Pickup Assigned' },
+  PICKUP_ON_THE_WAY:       { variant: 'softSecondary',label: 'On The Way' },
+  REPAIR_ESTIMATE_PROCESSING: { variant: 'softWarning', label: 'Estimate Submitted' },
+  DEVICE_PICKED_UP:        { variant: 'softSecondary',label: 'Device Picked Up' },
+  PICKED_UP:               { variant: 'softSecondary',label: 'Device Picked Up' },
+  REACHED_SHOP:            { variant: 'softSuccess',  label: 'Reached Shop' },
+  RECEIVED_AT_SHOP:        { variant: 'softSuccess',  label: 'Received at Shop' },
   ACCEPTED:                { variant: 'softPrimary',  label: 'Accepted' },
   IN_TRANSIT:              { variant: 'softSecondary',label: 'In Transit' },
   COMPLETED:               { variant: 'softSuccess',  label: 'Completed' },
@@ -62,6 +71,23 @@ function repairServiceText(item) {
   return services.length ? services.join(', ') : item?.issueSummary;
 }
 
+function MediaTile({ uri, label, video }) {
+  return (
+    <View className="flex-1 px-1">
+      <View className="h-24 rounded-xl bg-background border border-border items-center justify-center overflow-hidden">
+        {uri && !video ? (
+          <Image source={{ uri }} className="w-full h-full" resizeMode="cover" />
+        ) : uri && video ? (
+          <Video size={22} color="#00008B" />
+        ) : (
+          <Camera size={20} color="#94A3B8" />
+        )}
+      </View>
+      <Text className="text-[9px] text-text-muted text-center mt-1" numberOfLines={1}>{label}</Text>
+    </View>
+  );
+}
+
 export default function OwnerPickupServiceDetailScreen({ navigation, route }) {
   const id = route?.params?.id;
   const preloaded = route?.params?.booking;
@@ -96,7 +122,8 @@ export default function OwnerPickupServiceDetailScreen({ navigation, route }) {
     : '—';
   const serviceText = repairServiceText(data);
   const pickupAgent = data?.pickupPersonName || null;
-  const isUnconfirmed = data?.status === 'ORDER_PLACED';
+  const isUnconfirmed = data?.status === 'ORDER_PLACED' || data?.status === 'PICKUP_REQUESTED';
+  const hasDeviceImages = !!(data?.frontImageUrl || data?.backImageUrl || data?.videoUrl);
   const [confirming, setConfirming] = useState(false);
 
   const handleConfirmOrder = async () => {
@@ -118,6 +145,25 @@ export default function OwnerPickupServiceDetailScreen({ navigation, route }) {
       bookingId: data?.id,
       bookingNumber: data?.bookingNumber,
     });
+  };
+
+  // Shop-staff "Received by Shop Staff" hand-off — only enabled when the
+  // pickup person has already pinged Reached Shop (50m-validated server
+  // side). Triggers the ticket mint so the booking shows up in the shop
+  // owner's Bookings History list and unlocks technician assignment.
+  const [receiving, setReceiving] = useState(false);
+  const handleMarkReceived = async () => {
+    if (!data?.id || receiving) return;
+    setReceiving(true);
+    try {
+      const resp = await markPickupReceivedAtShop(data.id);
+      await load();
+      Alert.alert('Received', resp?.message || 'Device received at shop.');
+    } catch (e) {
+      Alert.alert('Could not confirm', e?.body?.error || e?.message || 'Please try again.');
+    } finally {
+      setReceiving(false);
+    }
   };
 
   return (
@@ -212,12 +258,37 @@ export default function OwnerPickupServiceDetailScreen({ navigation, route }) {
             </View>
           </View>
 
+          {data.status === 'REACHED_SHOP' || data.status === 'RECEIVED_AT_SHOP' ? (
+            <View className="bg-card border border-border rounded-2xl px-3 py-2.5 mb-2">
+              <View className="flex-row items-center">
+                <View className={`h-9 w-9 rounded-lg ${data.status === 'RECEIVED_AT_SHOP' ? 'bg-success/10' : 'bg-warning/10'} items-center justify-center mr-2.5`}>
+                  <CheckCircle2 size={16} color={data.status === 'RECEIVED_AT_SHOP' ? '#16A34A' : '#D97706'} />
+                </View>
+                <View className="flex-1 mr-2">
+                  <Text className="text-[10px] text-text-muted">Shop hand-off</Text>
+                  <Text className="text-[13px] font-bold text-text" numberOfLines={1}>
+                    {data.status === 'RECEIVED_AT_SHOP'
+                      ? `Received${data.receivedByUserName ? ' by ' + data.receivedByUserName : ''}`
+                      : 'Confirm device received by shop staff'}
+                  </Text>
+                  {data.status === 'RECEIVED_AT_SHOP' && data.receivedAtShopAt ? (
+                    <Text className="text-[10px] text-text-muted mt-0.5">{fmtInstant(data.receivedAtShopAt)}</Text>
+                  ) : null}
+                </View>
+                {data.status === 'REACHED_SHOP' ? (
+                  <Button size="sm" variant="primary" elevated={false}
+                    loading={receiving} onPress={handleMarkReceived}>
+                    Mark Received
+                  </Button>
+                ) : null}
+              </View>
+            </View>
+          ) : null}
+
           <View className="bg-card border border-border rounded-2xl px-3 py-2.5 mb-2">
             <Text className="text-[12px] font-extrabold text-text mb-1">Order</Text>
-            <Row icon={Hash}        label="Order id"      value={data.id} />
-            {data.ticketId ? (
-              <Row icon={FileText}  label="Ticket id"     value={data.ticketId} />
-            ) : null}
+            <Row icon={Hash}        label="Ticket ID"      value={data.bookingNumber || data.id} />
+            <Row icon={FileText}    label="Booking UUID"   value={data.id} />
             {data.estimateAmount != null ? (
               <Row icon={IndianRupee} label="Estimate"    value={`₹${data.estimateAmount}`} />
             ) : null}
@@ -227,6 +298,17 @@ export default function OwnerPickupServiceDetailScreen({ navigation, route }) {
             {serviceText ? <Row icon={FileText} label="Repair Service" value={serviceText} /> : null}
             <Row icon={Calendar} label="Created" value={fmtInstant(data.createdAt)} />
           </View>
+
+          {hasDeviceImages ? (
+            <View className="bg-card border border-border rounded-2xl px-3 py-2.5 mb-2">
+              <Text className="text-[12px] font-extrabold text-text mb-2">Device Images</Text>
+              <View className="flex-row -mx-1">
+                <MediaTile uri={data.frontImageUrl} label="Front Side" />
+                <MediaTile uri={data.backImageUrl} label="Back Side" />
+                <MediaTile uri={data.videoUrl} label="Coverage" video />
+              </View>
+            </View>
+          ) : null}
 
           {Array.isArray(data.events) && data.events.length > 0 ? (
             <View className="bg-card border border-border rounded-2xl px-3 py-2.5 mb-2">

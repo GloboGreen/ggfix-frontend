@@ -23,6 +23,7 @@ import { getRepairBooking } from '../../../api/orders';
 import { getBrands, getModelsByBrand, getRamOptions, getStorageOptions } from '../../../api/masterData';
 import { getShop } from '../../../api/shops';
 import { listAddresses } from '../../../api/customer';
+import { parsePickupMeta } from '../../../utils/pickupEstimateMeta';
 
 const fmtDateTime = (v) => {
   if (!v) return '-';
@@ -148,15 +149,33 @@ export default function RepairOrderDetailsScreen({ navigation, route }) {
     );
   }
 
-  const approvalDone = (b.customerApproval || '').toUpperCase() === 'DONE';
-  const serviceNames = (b.services || []).map((s) => s.serviceName).join(', ');
+  const { clean: cleanIssue, meta } = parsePickupMeta(b.issueSummary);
+  // Prefer real columns; fall back to meta when the pickup-estimate appendix
+  // is the only place a field actually lives.
+  const metaServices = (meta?.services || []).map((s) => ({
+    serviceName: s.name || s.serviceName || s.code,
+    estimatedPrice: Number(s.price) || 0,
+  })).filter((s) => s.serviceName);
+  const bookingServices = b.services || [];
+  const bookingServiceTotal = bookingServices.reduce((s, x) => s + Number(x.estimatedPrice || 0), 0);
+  // If the booking's per-service rows have no prices (the submitPickupRepairEstimate
+  // endpoint only updates estimateAmount, not service line prices) but the meta
+  // carries them, render the meta lines instead so the price summary isn't all ₹0.
+  const displayServices = (bookingServices.length && bookingServiceTotal > 0)
+    ? bookingServices
+    : (metaServices.length ? metaServices : bookingServices);
+  const serviceNames = displayServices.map((s) => s.serviceName).join(', ');
   const priceTotal = b.estimateAmount != null
     ? Number(b.estimateAmount)
-    : (b.services || []).reduce((s, x) => s + Number(x.estimatedPrice || 0), 0);
-  const estTimeText = b.estimatedReadyAt
-    ? `${fmtDateTime(b.estimatedReadyAt)}${b.estimatedDurationHours ? `, ${b.estimatedDurationHours}Hr` : ''}`
+    : displayServices.reduce((s, x) => s + Number(x.estimatedPrice || 0), 0);
+  // Producer key today is estimatedReadyAt; older rows used estimatedPickupAt.
+  const readyAt = b.estimatedReadyAt || meta?.estimatedReadyAt || meta?.estimatedPickupAt || null;
+  const deliveryAt = b.estimatedDeliveryAt || meta?.estimatedDeliveryAt || null;
+  const estTimeText = readyAt
+    ? `${fmtDateTime(readyAt)}${b.estimatedDurationHours ? `, ${b.estimatedDurationHours}Hr` : ''}`
     : '-';
-  const approvalText = (b.customerApproval || '').toUpperCase() === 'DONE' ? 'Done' : (b.customerApproval || 'Pending');
+  const approvalDone = (b.customerApproval || '').toUpperCase() === 'DONE' || meta?.customerApproved === true;
+  const approvalText = approvalDone ? 'Done' : (b.customerApproval || 'Pending');
   const hasDevicePhotos = !!(b.frontImageUrl || b.backImageUrl || b.videoUrl);
   const bookingNo = b.bookingNumber
     ? (String(b.bookingNumber).startsWith('#') ? b.bookingNumber : `#${b.bookingNumber}`)
@@ -248,10 +267,10 @@ export default function RepairOrderDetailsScreen({ navigation, route }) {
         ) : null}
 
         {/* Price Summary */}
-        {(b.services?.length || b.estimateAmount != null) ? (
+        {(displayServices.length || b.estimateAmount != null) ? (
           <Card className="rounded-2xl mb-3">
             <CardTitle className="mb-1.5">Price Summary</CardTitle>
-            {(b.services || []).map((s, i) => (
+            {displayServices.map((s, i) => (
               <View key={i} className="flex-row items-center justify-between py-1">
                 <View className="flex-row items-center flex-1 pr-2">
                   <View className="h-4 w-4 rounded bg-primary/10 items-center justify-center mr-2">
@@ -272,9 +291,9 @@ export default function RepairOrderDetailsScreen({ navigation, route }) {
         {/* Repair Details */}
         <Card className="rounded-2xl mb-3">
           <CardTitle className="mb-1">Repair Details</CardTitle>
-          <DetailLine label="Complaint Issue" value={b.issueSummary} />
+          <DetailLine label="Complaint Issue" value={cleanIssue} />
           <DetailLine label="Estimated Approximate Time" value={estTimeText} />
-          <DetailLine label="Estimated Delivery Date" value={fmtDateTime(b.estimatedDeliveryAt)} />
+          <DetailLine label="Estimated Delivery Date" value={fmtDateTime(deliveryAt)} />
           <DetailLine
             label="Customer Repair Approval"
             value={approvalText}

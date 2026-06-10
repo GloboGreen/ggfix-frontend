@@ -60,6 +60,15 @@ export async function assignPickupPerson(id, { pickupPersonId, pickupPersonName,
     body: { pickupPersonId, pickupPersonName, pickupPersonPhone },
   });
 }
+// Shop staff confirms a Reached-Shop pickup booking — physical hand-off.
+// Hits ticket-service (where the pickup state machine lives) and returns
+// { id, status, ticketId, receivedByName, ... }. Idempotent: re-tapping
+// after the device was already received is a no-op success.
+export async function markPickupReceivedAtShop(id, { receivedByName } = {}) {
+  return await ticketApi.post(`/shop/pickup-bookings/${id}/receive-at-shop`, {
+    body: { receivedByName },
+  });
+}
 export async function cancelRepairBooking(id) {
   return await orderApi.post(`/repair-bookings/${id}/cancel`);
 }

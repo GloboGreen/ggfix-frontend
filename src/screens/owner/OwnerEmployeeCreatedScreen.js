@@ -28,7 +28,12 @@ export default function OwnerEmployeeCreatedScreen({ route, navigation }) {
         <View style={styles.buttons}>
           <TouchableOpacity
             style={styles.primaryBtn}
-            onPress={() => navigation.navigate('OwnerEmployeeList')}
+            onPress={() =>
+              navigation.reset({
+                index: 1,
+                routes: [{ name: 'OwnerTabs' }, { name: 'OwnerEmployeeList' }],
+              })
+            }
           >
             <Text style={styles.primaryBtnText}>Back to list</Text>
           </TouchableOpacity>

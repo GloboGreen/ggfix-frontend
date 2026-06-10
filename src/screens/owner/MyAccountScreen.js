@@ -108,35 +108,64 @@ export default function MyAccountScreen({ onLogout, navigation }) {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {/* Identity card */}
+        {/* Identity card — sits flush under the header (no negative-margin
+            overlap so the avatar never gets clipped by the ScrollView's
+            bounds). Top row carries avatar + name/verified/phone in one
+            balanced layout; the active-shop pill takes the row below so the
+            Switch button has room without crowding the phone number. */}
         <View style={styles.identityCard}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initials}</Text>
-          </View>
-          <View style={styles.identityText}>
-            <View style={styles.nameRow}>
-              <Text style={styles.name} numberOfLines={1}>{ownerName}</Text>
-              <View style={styles.verifiedPill}>
-                <Ionicons name="shield-checkmark" size={10} color={SUCCESS} />
-                <Text style={styles.verifiedText}>VERIFIED</Text>
+          <View style={styles.identityTop}>
+            <View style={styles.avatarRing}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{initials}</Text>
               </View>
             </View>
-            {phone ? <Text style={styles.phone}>{phone}</Text> : null}
-            <Pressable
-              style={styles.shopRow}
-              onPress={() => hasMultipleShops && setShowSwitcher(true)}
-              disabled={!hasMultipleShops}
-            >
-              <Ionicons name="storefront-outline" size={12} color={MUTED} />
-              <Text style={styles.shopName} numberOfLines={1}>{shopName || 'No shop linked'}</Text>
-              {hasMultipleShops ? (
-                <View style={styles.switchPill}>
-                  <Ionicons name="swap-horizontal" size={11} color={PRIMARY} />
-                  <Text style={styles.switchPillText}>Switch ({shops.length})</Text>
+            <View style={styles.identityText}>
+              <View style={styles.nameRow}>
+                <Text style={styles.name} numberOfLines={1}>{ownerName}</Text>
+                <View style={styles.verifiedPill}>
+                  <Ionicons name="shield-checkmark" size={10} color={SUCCESS} />
+                  <Text style={styles.verifiedText}>VERIFIED</Text>
+                </View>
+              </View>
+              {phone ? (
+                <View style={styles.metaRow}>
+                  <Ionicons name="call-outline" size={12} color={MUTED} />
+                  <Text style={styles.metaText}>{phone}</Text>
                 </View>
               ) : null}
-            </Pressable>
+            </View>
           </View>
+
+          {/* Shop pill — dedicated row so the switch action has space to
+              breathe and never collides with the phone number. */}
+          <Pressable
+            style={({ pressed }) => [
+              styles.shopPill,
+              hasMultipleShops && styles.shopPillSwitchable,
+              pressed && hasMultipleShops && { opacity: 0.85 },
+            ]}
+            onPress={() => hasMultipleShops && setShowSwitcher(true)}
+            disabled={!hasMultipleShops}
+          >
+            <View style={styles.shopPillLeft}>
+              <View style={styles.shopPillIcon}>
+                <Ionicons name="storefront" size={12} color={PRIMARY} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.shopPillLabel}>ACTIVE SHOP</Text>
+                <Text style={styles.shopPillName} numberOfLines={1}>
+                  {shopName || 'No shop linked'}
+                </Text>
+              </View>
+            </View>
+            {hasMultipleShops ? (
+              <View style={styles.switchChip}>
+                <Ionicons name="swap-horizontal" size={11} color="#FFFFFF" />
+                <Text style={styles.switchChipText}>Switch ({shops.length})</Text>
+              </View>
+            ) : null}
+          </Pressable>
         </View>
 
         {/* Shop switcher modal */}
@@ -287,13 +316,15 @@ function MenuRow({ icon, mci, label, onPress, last }) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
 
-  // Header
+  // Header — moderate bottom padding; identity card sits flush below the
+  // gradient (no negative-margin overlap) so nothing gets clipped by the
+  // ScrollView's bounds.
   header: {
     paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 26,
-    borderBottomLeftRadius: 22,
-    borderBottomRightRadius: 22,
+    paddingTop: 10,
+    paddingBottom: 22,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
   },
   headerTitle: {
     color: '#FFFFFF',
@@ -329,54 +360,89 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 14,
     paddingBottom: 24,
-    marginTop: -16,
+    paddingTop: 14,
   },
 
-  // Identity card
+  // Identity card — sits flush below the header, no overlap. Avatar lives
+  // inside the card so it can't be clipped by parent bounds.
   identityCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
     marginBottom: 14,
     shadowColor: '#0F172A',
     shadowOpacity: 0.08,
     shadowRadius: 12,
-    shadowOffset: { width: 0, height: 5 },
+    shadowOffset: { width: 0, height: 4 },
     elevation: 3,
   },
+  identityTop: { flexDirection: 'row', alignItems: 'center' },
+  avatarRing: {
+    padding: 3,
+    borderRadius: 34,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#EEF2FF',
+  },
   avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
     backgroundColor: PRIMARY,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: '#FFFFFF',
-    shadowColor: PRIMARY,
-    shadowOpacity: 0.18,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
   },
-  avatarText: { color: '#fff', fontSize: 20, fontWeight: '800', letterSpacing: 1 },
+  avatarText: { color: '#fff', fontSize: 19, fontWeight: '800', letterSpacing: 1 },
   identityText: { flex: 1, marginLeft: 12 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
-  name: { fontSize: 16, fontWeight: '800', color: TEXT, marginRight: 6 },
-  phone: { fontSize: 12, color: MUTED, marginTop: 2, fontWeight: '600' },
-  shopRow: { flexDirection: 'row', alignItems: 'center', marginTop: 3 },
-  shopName: { fontSize: 12, color: MUTED, marginLeft: 4, fontWeight: '600' },
-  switchPill: {
+
+  nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: 8,
-    backgroundColor: '#EEF2FF',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 999,
+    flexWrap: 'wrap',
   },
-  switchPillText: { fontSize: 10, color: PRIMARY, fontWeight: '700', marginLeft: 3 },
+  name: { fontSize: 16, fontWeight: '800', color: TEXT, marginRight: 8 },
+
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 5,
+  },
+  metaText: { fontSize: 12, color: MUTED, marginLeft: 5, fontWeight: '600' },
+
+  // Active-shop pill — full-width row underneath the identity, holds its own
+  // label/value pair on the left and the switch action on the right.
+  shopPill: {
+    marginTop: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingLeft: 10,
+    paddingRight: 8,
+  },
+  shopPillSwitchable: { backgroundColor: '#EEF2FF', borderColor: '#C7D2FE' },
+  shopPillLeft: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+  shopPillIcon: {
+    width: 28, height: 28, borderRadius: 9, backgroundColor: '#FFFFFF',
+    alignItems: 'center', justifyContent: 'center', marginRight: 10,
+    borderWidth: 1, borderColor: '#C7D2FE',
+  },
+  shopPillLabel: {
+    fontSize: 9, fontWeight: '800', color: PRIMARY, letterSpacing: 1, marginBottom: 1,
+  },
+  shopPillName: { fontSize: 13, fontWeight: '700', color: TEXT },
+  switchChip: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: PRIMARY,
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999,
+    marginLeft: 8,
+  },
+  switchChipText: { fontSize: 10.5, color: '#FFFFFF', fontWeight: '800', marginLeft: 4 },
 
   modalBackdrop: {
     flex: 1,

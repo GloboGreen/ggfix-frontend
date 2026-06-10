@@ -4,6 +4,7 @@ import { CheckCircle2, Smartphone } from 'lucide-react-native';
 import { Card, Loader, EmptyState } from '../../../components/rnr';
 import { getRepairBooking } from '../../../api/orders';
 import { resolveBookingDevice } from '../../../utils/bookingDevice';
+import { cleanIssueSummary } from '../../../utils/pickupEstimateMeta';
 
 const money = (n) => `₹${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -120,7 +121,7 @@ export default function ServiceReceiptScreen({ route }) {
             <View className="h-px bg-border my-3" />
 
             {/* Service details */}
-            {b.issueSummary ? <InfoLine label="Complaint Issue" value={b.issueSummary} /> : null}
+            {(() => { const ci = cleanIssueSummary(b.issueSummary); return ci ? <InfoLine label="Complaint Issue" value={ci} /> : null; })()}
             <InfoLine label="Estimated Approximate Time" value={estTime} />
             <InfoLine label="Estimated Delivery Date" value={fmtDateTime(b.estimatedDeliveryAt)} />
             <InfoLine label="Customer Repair Approval" value={approval} valueClass="text-success" />

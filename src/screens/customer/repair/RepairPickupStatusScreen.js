@@ -5,19 +5,56 @@ import { Check } from 'lucide-react-native';
 import { Card, Loader } from '../../../components/rnr';
 import { getRepairBooking } from '../../../api/orders';
 
-// Doorstep-pickup status flow (distinct from the in-shop service flow). The
-// shop advances these from the owner app; each step lights up + timestamps from
-// the booking's events.
+// Canonical doorstep-pickup status flow. Each step's `key` is the canonical
+// event status the pickup person / shop emits; `aliases` lists the older
+// event-status keys we used to write (kept so in-flight bookings created
+// before the rename still render correctly).
 const PICKUP_STEPS = [
-  { key: 'ORDER_PLACED',            label: 'Order Placed' },
-  { key: 'ORDER_SERVICE_CONFIRMED', label: 'Order Service Confirmed' },
-  { key: 'PICKUP_ASSIGNED',         label: 'Pick Up Present Assigned' },
-  { key: 'ESTIMATE_PROCESSING',     label: 'Pick Up Present Repair Estimated Value Processing' },
-  { key: 'ESTIMATE_ACCEPTED',       label: 'Customer Repair Estimated Value Accepted' },
-  { key: 'DEVICE_RECEIVED',         label: 'Repair Device Received to Pickup Present' },
-  { key: 'DEVICE_DELIVERY_TO_SHOP', label: 'Pickup Present Repair Device Delivery to Shop' },
-  { key: 'DEVICE_RETURNED',         label: 'Repair Device Return to Customer Home' },
+  {
+    key: 'PICKUP_REQUESTED',
+    label: 'Pickup Requested',
+    aliases: ['ORDER_PLACED', 'BOOKING_CREATED_BY_SHOP'],
+  },
+  {
+    key: 'PICKUP_ACCEPTED',
+    label: 'Pickup Accepted',
+    aliases: ['ORDER_SERVICE_CONFIRMED', 'SERVICE_ACCEPTED'],
+  },
+  {
+    key: 'PICKUP_PERSON_ASSIGNED',
+    label: 'Pickup Person Assigned',
+    aliases: ['PICKUP_ASSIGNED', 'PICKUP_REASSIGNED'],
+  },
+  {
+    key: 'PICKUP_ON_THE_WAY',
+    label: 'Pickup Person On The Way',
+    aliases: [],
+  },
+  {
+    key: 'REPAIR_ESTIMATE_PROCESSING',
+    label: 'Repair Estimate Processing',
+    aliases: ['ESTIMATE_PROCESSING', 'ESTIMATE_SUBMITTED'],
+  },
+  {
+    key: 'DEVICE_PICKED_UP',
+    label: 'Device Picked Up',
+    aliases: ['PICKED_UP', 'DEVICE_RECEIVED'],
+  },
+  {
+    key: 'REACHED_SHOP',
+    label: 'Reached Shop',
+    aliases: ['DEVICE_DELIVERY_TO_SHOP'],
+  },
 ];
+
+// Picks the first matching event for a step (canonical key first, then any alias).
+function eventForStep(step, eventByStatus) {
+  if (eventByStatus[step.key]) return eventByStatus[step.key];
+  for (const a of (step.aliases || [])) {
+    if (eventByStatus[a]) return eventByStatus[a];
+  }
+  return null;
+}
 
 const fmt = (v) => {
   if (!v) return '';
@@ -55,13 +92,22 @@ export default function RepairPickupStatusScreen({ route }) {
   const statusUpper = (b?.status || '').toUpperCase();
   const events = b?.events || [];
   const eventByStatus = {};
-  events.forEach((e) => { const k = (e.status || '').toUpperCase(); if (!eventByStatus[k]) eventByStatus[k] = e; });
+  // Keep the LATEST event per status code (events array is ascending by
+  // createdAt) so re-emitted statuses always show the most recent timestamp.
+  events.forEach((e) => {
+    const k = (e.status || '').toUpperCase();
+    eventByStatus[k] = e;
+  });
 
   let currentIdx = -1;
   for (let i = PICKUP_STEPS.length - 1; i >= 0; i -= 1) {
-    if (eventByStatus[PICKUP_STEPS[i].key]) { currentIdx = i; break; }
+    if (eventForStep(PICKUP_STEPS[i], eventByStatus)) { currentIdx = i; break; }
   }
-  if (currentIdx === -1) currentIdx = PICKUP_STEPS.findIndex((s) => s.key === statusUpper);
+  if (currentIdx === -1) {
+    currentIdx = PICKUP_STEPS.findIndex((s) =>
+      s.key === statusUpper || (s.aliases || []).includes(statusUpper)
+    );
+  }
   if (currentIdx === -1) currentIdx = 0;
   const currentLabel = PICKUP_STEPS[currentIdx]?.label || (b?.status || '').replace(/_/g, ' ');
 
@@ -85,7 +131,7 @@ export default function RepairPickupStatusScreen({ route }) {
 
       <Card className="rounded-2xl">
         {PICKUP_STEPS.map((step, i) => {
-          const ev = eventByStatus[step.key];
+          const ev = eventForStep(step, eventByStatus);
           const reached = i <= currentIdx || !!ev;
           const isCurrent = i === currentIdx;
           const isLast = i === PICKUP_STEPS.length - 1;

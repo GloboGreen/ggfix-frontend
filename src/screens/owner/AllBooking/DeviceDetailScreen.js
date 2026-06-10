@@ -204,60 +204,59 @@ export default function DeviceDetailScreen({ route, navigation }) {
           </Card>
         ) : null}
 
-        {/* Schedule + Approval */}
-        {(readyAtText || deliveryAtText || approvalText) ? (
-          <Card className="rounded-2xl mb-2.5">
-            <View className="flex-row items-center mb-1.5">
-              <CalendarClock size={14} color="#F59E0B" />
-              <CardTitle className="ml-2">Service Schedule</CardTitle>
+        {/* Schedule + Approval — render the section even when fields are
+            empty so the Device Details layout stays consistent across all
+            tickets. Customer-placed pickup bookings don't carry schedule
+            data until the shop technician fills it in; show "Not yet set"
+            instead of hiding the card. */}
+        <Card className="rounded-2xl mb-2.5">
+          <View className="flex-row items-center mb-1.5">
+            <CalendarClock size={14} color="#F59E0B" />
+            <CardTitle className="ml-2">Service Schedule</CardTitle>
+          </View>
+          <Row icon={<Clock size={12} color="#64748B" />} label="Approx. Time" value={readyAtText || 'Not yet set'} />
+          <Row icon={<CalendarClock size={12} color="#64748B" />} label="Delivery" value={deliveryAtText || 'Not yet set'} />
+          <View className="flex-row items-start py-1">
+            <View className="w-4 items-center mr-1.5 mt-1">
+              <CheckCircle2 size={12} color={approvalText === 'Done' ? '#10B981' : '#94A3B8'} />
             </View>
-            {readyAtText ? (
-              <Row icon={<Clock size={12} color="#64748B" />} label="Approx. Time" value={readyAtText} />
-            ) : null}
-            {deliveryAtText ? (
-              <Row icon={<CalendarClock size={12} color="#64748B" />} label="Delivery" value={deliveryAtText} />
-            ) : null}
-            {approvalText ? (
-              <View className="flex-row items-start py-1">
-                <View className="w-4 items-center mr-1.5 mt-1">
-                  <CheckCircle2 size={12} color={approvalText === 'Done' ? '#10B981' : '#94A3B8'} />
-                </View>
-                <Text className="text-[11px] text-text-muted w-20">Approval</Text>
-                <Text className={`text-[12px] font-bold ${approvalText === 'Done' ? 'text-success' : 'text-text-muted'}`}>
-                  {approvalText}
-                </Text>
-              </View>
-            ) : null}
-          </Card>
-        ) : null}
-
-        {/* Device Photos */}
-        {(photos.front || photos.back || photos.video) ? (
-          <Card className="rounded-2xl mb-2.5">
-            <View className="flex-row items-center mb-2">
-              <Camera size={14} color="#7C3AED" />
-              <CardTitle className="ml-2">Device Photos</CardTitle>
-            </View>
-            <View className="flex-row -mx-1">
-              <PhotoSlot label="Front Side" uri={photos.front} icon={Camera} />
-              <PhotoSlot label="Back Side" uri={photos.back} icon={Camera} />
-              <PhotoSlot label="Full Coverage Video" uri={photos.video} icon={PlayCircle} />
-            </View>
-          </Card>
-        ) : null}
-
-        {/* Device Security */}
-        {(securityType || securityValue) ? (
-          <Card className="rounded-2xl mb-2.5">
-            <View className="flex-row items-center mb-1.5">
-              <ShieldCheck size={14} color="#0EA5E9" />
-              <CardTitle className="ml-2">Device Security</CardTitle>
-            </View>
-            <Text className="text-[12px] text-text">
-              {[securityType, securityValue].filter(Boolean).join(' - ')}
+            <Text className="text-[11px] text-text-muted w-20">Approval</Text>
+            <Text className={`text-[12px] font-bold ${approvalText === 'Done' ? 'text-success' : 'text-text-muted'}`}>
+              {approvalText || 'Pending'}
             </Text>
-          </Card>
-        ) : null}
+          </View>
+        </Card>
+
+        {/* Device Photos — always shown; PhotoSlot renders the dashed
+            placeholder when uri is missing, so an empty card still
+            communicates the slots the technician/pickup-person needs to
+            fill. */}
+        <Card className="rounded-2xl mb-2.5">
+          <View className="flex-row items-center mb-2">
+            <Camera size={14} color="#7C3AED" />
+            <CardTitle className="ml-2">Device Photos</CardTitle>
+          </View>
+          <View className="flex-row -mx-1">
+            <PhotoSlot label="Front Side" uri={photos.front} icon={Camera} />
+            <PhotoSlot label="Back Side" uri={photos.back} icon={Camera} />
+            <PhotoSlot label="Full Coverage Video" uri={photos.video} icon={PlayCircle} />
+          </View>
+        </Card>
+
+        {/* Device Security — always shown so the layout matches walk-in
+            tickets. Customer pickup bookings often don't capture a PIN /
+            pattern, so display the empty state clearly. */}
+        <Card className="rounded-2xl mb-2.5">
+          <View className="flex-row items-center mb-1.5">
+            <ShieldCheck size={14} color="#0EA5E9" />
+            <CardTitle className="ml-2">Device Security</CardTitle>
+          </View>
+          <Text className="text-[12px] text-text">
+            {securityType || securityValue
+              ? [securityType, securityValue].filter(Boolean).join(' - ')
+              : <Text className="text-text-muted">Not provided</Text>}
+          </Text>
+        </Card>
 
         {/* Missing / Damage Parts */}
         <Card className="rounded-2xl mb-2.5">
